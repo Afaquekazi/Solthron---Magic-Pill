@@ -9,7 +9,7 @@ let solthronContainer;
 let currentCategory = null;
 let activeNoteId = null;
 let isStarActive = false;
-let isButtonVisible = true;
+let isButtonVisible = false;
 let pageCredits = null;
 
 // ========== MAGIC PILL VARIABLES ==========
@@ -1353,16 +1353,13 @@ function showPDFAnalysisNotification(filename, fileSize, platform) {
         fileAnalysisNotification = null;
     }
     
-    const extensionButton = shadowRoot.querySelector('#solthron-floating-button');
-    if (!extensionButton) return;
-    
     // Create notification popup
     const notification = document.createElement('div');
     notification.className = 'pdf-analysis-notification';
     notification.style.cssText = `
-        position: absolute;
-        bottom: 60px;
-        right: -10px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
         background: #2c2c2c;
         color: white;
         padding: 16px;
@@ -1373,6 +1370,7 @@ function showPDFAnalysisNotification(filename, fileSize, platform) {
         border: 2px solid rgba(255,215,0,0.4);
         z-index: 10003;
         animation: pdfAnalysisSlide 0.4s ease-out;
+        pointer-events: auto;
     `;
     
     const displayName = filename.length > 25 ? filename.substring(0, 22) + '...' : filename;
@@ -1501,8 +1499,8 @@ function showPDFAnalysisNotification(filename, fileSize, platform) {
         fileAnalysisNotification = null;
     });
     
-    // Add to extension button
-    extensionButton.appendChild(notification);
+    // Add directly to shadow root
+    shadowRoot.appendChild(notification);
     fileAnalysisNotification = notification;
     
     // Auto-dismiss after 30 seconds
@@ -1523,16 +1521,13 @@ function showExcelAnalysisNotification(filename, fileSize, platform) {
         fileAnalysisNotification = null;
     }
     
-    const extensionButton = shadowRoot.querySelector('#solthron-floating-button');
-    if (!extensionButton) return;
-    
     // Create notification popup
     const notification = document.createElement('div');
     notification.className = 'excel-analysis-notification';
     notification.style.cssText = `
-        position: absolute;
-        bottom: 60px;
-        right: -10px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
         background: #2c2c2c;
         color: white;
         padding: 16px;
@@ -1543,6 +1538,7 @@ function showExcelAnalysisNotification(filename, fileSize, platform) {
         border: 2px solid rgba(34,139,34,0.4);
         z-index: 10003;
         animation: excelAnalysisSlide 0.4s ease-out;
+        pointer-events: auto;
     `;
     
     const displayName = filename.length > 25 ? filename.substring(0, 22) + '...' : filename;
@@ -1671,8 +1667,8 @@ function showExcelAnalysisNotification(filename, fileSize, platform) {
         fileAnalysisNotification = null;
     });
     
-    // Add to extension button
-    extensionButton.appendChild(notification);
+    // Add directly to shadow root
+    shadowRoot.appendChild(notification);
     fileAnalysisNotification = notification;
     
     // Auto-dismiss after 30 seconds
@@ -1693,16 +1689,13 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
         fileAnalysisNotification = null;
     }
     
-    const extensionButton = shadowRoot.querySelector('#solthron-floating-button');
-    if (!extensionButton) return;
-    
     // Create notification popup
     const notification = document.createElement('div');
     notification.className = 'image-analysis-notification';
     notification.style.cssText = `
-        position: absolute;
-        bottom: 60px;
-        right: -10px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
         background: #2c2c2c;
         color: white;
         padding: 16px;
@@ -1713,6 +1706,7 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
         border: 2px solid rgba(138,43,226,0.4);
         z-index: 10003;
         animation: imageAnalysisSlide 0.4s ease-out;
+        pointer-events: auto;
     `;
     
     const displayName = filename.length > 25 ? filename.substring(0, 22) + '...' : filename;
@@ -1841,8 +1835,8 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
         fileAnalysisNotification = null;
     });
     
-    // Add to extension button
-    extensionButton.appendChild(notification);
+    // Add directly to shadow root
+    shadowRoot.appendChild(notification);
     fileAnalysisNotification = notification;
     
     // Auto-dismiss after 30 seconds
@@ -1863,16 +1857,13 @@ function showCodeAnalysisNotification(codeAnalysis, contentLength, platform) {
         codeAnalysisNotification = null;
     }
     
-    const extensionButton = shadowRoot.querySelector('#solthron-floating-button');
-    if (!extensionButton) return;
-    
     // Create notification popup
     const notification = document.createElement('div');
     notification.className = 'code-analysis-notification';
     notification.style.cssText = `
-        position: absolute;
-        bottom: 60px;
-        right: -10px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
         background: #2c2c2c;
         color: white;
         padding: 16px;
@@ -1883,6 +1874,7 @@ function showCodeAnalysisNotification(codeAnalysis, contentLength, platform) {
         border: 2px solid rgba(30,144,255,0.4);
         z-index: 10003;
         animation: codeAnalysisSlide 0.4s ease-out;
+        pointer-events: auto;
     `;
     
     const languageDisplay = codeAnalysis.language !== 'unknown' ? 
@@ -3227,7 +3219,7 @@ function createUI() {
         }
 
         .solthron-content {
-            padding: 2px 12px 12px 12px;
+            padding: 12px;
             position: relative;
         }
 
@@ -3993,17 +3985,7 @@ function createUI() {
         </div>
         
         <div id="solthron-container" class="solthron-container" style="display: none;">
-            <div class="solthron-content">
-                <!-- Magic Pill Toggle -->
-                <div class="magic-pill-toggle">
-                    <div class="magic-pill-label">
-                        🪄 <span>Magic Pill</span>
-                    </div>
-                    <div class="toggle-switch" id="magic-pill-toggle">
-                        <div class="toggle-slider"></div>
-                    </div>
-                </div>
-                
+            <div class="solthron-content"> 
                 <div class="solthron-header">
                     <div class="mode-dropdown">
                         <select class="mode-select">
@@ -4124,6 +4106,9 @@ function createUI() {
     // Initialize UI handlers and gallery
     initializeUIHandlers();
     initializeGallery();
+
+    // Hide button initially
+    button.style.display = 'none';
 }
 
 function initializeGallery() {
