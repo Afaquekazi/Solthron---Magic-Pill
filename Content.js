@@ -20,17 +20,13 @@ let lastMagicPillClick = 0;
 const MAGIC_PILL_COOLDOWN = 2000; // 2 seconds cooldown
 
 
-// ========== FILE & CODE ANALYSIS VARIABLES ==========
-let codeAnalysisEnabled = true; // Always enabled for code detection
-let lastCodeAnalysis = 0;
-let codeAnalysisNotification = null;
-const CODE_ANALYSIS_COOLDOWN = 5000; // 5 seconds cooldown between code analyses
+// ========== FILE ANALYSIS VARIABLES ==========
 let fileAnalysisEnabled = true; // Always enabled for all file types
 let pdfAnalysisEnabled = true; // Always enabled
 let currentlyAttachedFile = null;
 let fileAnalysisNotification = null;
 let lastFileProcessed = null;
-const PDF_ANALYSIS_COOLDOWN = 3000; // 3 seconds cooldown between file analyses
+const FILE_ANALYSIS_COOLDOWN = 3000; // 3 seconds cooldown between file analyses
 
 // ✨ Double-click animation function
 function triggerDoubleClickAnimation() {
@@ -65,7 +61,8 @@ function getFeatureCredits(mode) {
     const imageModes = ['image_prompt']; // Removed image_caption
     const freeModes = ['save_note', 'save_prompt', 'save_persona'];
     const magicPillModes = ['magic_pill_enhance'];
-    const fileAnalysisModes = ['pdf_analysis', 'excel_analysis', 'image_analysis', 'code_analysis']; // UPDATED: Added code_analysis
+    const fileAnalysisModes = ['pdf_analysis', 'excel_analysis', 'image_analysis'];
+
     
     if (explainModes.includes(mode)) return 5;
     if (aiAssistantModes.includes(mode)) return 15;
@@ -601,210 +598,6 @@ function initializeFileAnalysis() {
     monitorFileUploads(platform);
 }
 
-function initializeCodeAnalysis() {
-    const platform = detectAIPlatform();
-    console.log('💻 Initializing Code Analysis for:', platform);
-    
-    if (platform === 'unknown') {
-        console.log('❌ Platform not supported for code analysis');
-        return;
-    }
-    
-    if (!codeAnalysisEnabled) {
-        console.log('❌ Code analysis not enabled');
-        return;
-    }
-    
-    console.log('✅ Setting up code detection in input fields');
-    monitorCodeInput(platform);
-}
-
-function monitorCodeInput(platform) {
-    console.log(`🔍 Starting code input monitoring for ${platform}`);
-    
-    // Monitor input changes for code detection
-    let codeDetectionTimer = null;
-    
-    function handleInputForCodeDetection(inputElement) {
-        // Clear existing timer
-        if (codeDetectionTimer) {
-            clearTimeout(codeDetectionTimer);
-        }
-        
-        // Debounce - wait 3 seconds after user stops typing
-        codeDetectionTimer = setTimeout(() => {
-            const content = getInputText(inputElement);
-            if (content && content.trim().length > 50) { // Minimum length for code detection
-                analyzeForCode(content, inputElement, platform);
-            }
-        }, 3000);
-    }
-    
-    // Monitor magic pill input field if available
-    if (currentInputField) {
-        console.log('📎 Adding code detection to magic pill input field');
-        currentInputField.addEventListener('input', () => handleInputForCodeDetection(currentInputField));
-        currentInputField.addEventListener('paste', () => {
-            // Handle paste events with slight delay to get pasted content
-            setTimeout(() => handleInputForCodeDetection(currentInputField), 100);
-        });
-    }
-    
-    // Also monitor common input selectors across platforms
-    const inputSelectors = {
-        chatgpt: ['#prompt-textarea', 'textarea[data-id="root"]', 'div[contenteditable="true"]'],
-        claude: ['div.ProseMirror[contenteditable="true"]', 'div[contenteditable="true"]'],
-        gemini: ['.ql-editor[contenteditable="true"]', 'div[contenteditable="true"]'],
-        deepseek: ['textarea[placeholder*="Message"]', 'div[contenteditable="true"]'],
-        grok: ['textarea', 'div[contenteditable="true"]']
-    };
-    
-    const platformSelectors = inputSelectors[platform] || ['textarea', 'div[contenteditable="true"]'];
-    
-    for (const selector of platformSelectors) {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(element => {
-            // Check if already monitored
-            if (!element.hasAttribute('data-solthron-code-monitored')) {
-                element.addEventListener('input', () => handleInputForCodeDetection(element));
-                element.addEventListener('paste', () => {
-                    setTimeout(() => handleInputForCodeDetection(element), 100);
-                });
-                element.setAttribute('data-solthron-code-monitored', 'true');
-                console.log('📎 Added code detection to input element:', selector);
-            }
-        });
-    }
-    
-    console.log('✅ Code input monitoring initialized');
-}
-
-function analyzeForCode(content, inputElement, platform) {
-    // Check cooldown
-    const now = Date.now();
-    if (now - lastCodeAnalysis < CODE_ANALYSIS_COOLDOWN) {
-        console.log('⏱️ Code analysis cooldown active');
-        return;
-    }
-    
-    // NEW: Check if content contains our analysis prompts (to prevent notification loop)
-    const analysisIndicators = [
-        'debug and troubleshoot this code',
-        'analyze this code for bugs',
-        'optimize this code for performance',
-        'convert this code to',
-        'provide a detailed line-by-line explanation',
-        'generate comprehensive test cases',
-        'perform comprehensive debugging analysis',
-        'enhance code performance and documentation'
-    ];
-    
-    const contentLower = content.toLowerCase();
-    const hasAnalysisPrompt = analysisIndicators.some(indicator => contentLower.includes(indicator));
-    
-    if (hasAnalysisPrompt) {
-        console.log('📝 Content contains analysis prompt - skipping code detection to prevent loop');
-        return;
-    }
-    
-    const codeAnalysis = detectCodeContent(content);
-    
-    if (codeAnalysis.isCode) {
-        console.log('💻 Code detected:', codeAnalysis.language, 'confidence:', codeAnalysis.confidence);
-        console.log('📝 Code preview:', content.substring(0, 100) + '...');
-        
-        lastCodeAnalysis = now;
-        
-        // Show code analysis notification
-        showCodeAnalysisNotification(codeAnalysis, content.length, platform);
-    } else {
-        console.log('📝 Content not detected as code (confidence:', codeAnalysis.confidence + ')');
-    }
-}
-
-function detectCodeContent(content) {
-    const text = content.toLowerCase().trim();
-    let codeScore = 0;
-    let detectedLanguage = 'unknown';
-    
-    // Programming language keywords and patterns
-    const languagePatterns = {
-        javascript: ['function', 'const', 'let', 'var', '=>', 'console.log', 'document.', 'window.', '.js', 'react', 'node'],
-        python: ['def ', 'import ', 'from ', 'class ', '__init__', 'print(', 'if __name__', '.py', 'django', 'flask'],
-        java: ['public class', 'public static', 'private ', 'protected ', 'import java', '.java', 'system.out'],
-        cpp: ['#include', 'iostream', 'std::', 'cout', 'cin', 'int main', '.cpp', '.h'],
-        csharp: ['using system', 'public class', 'private ', 'public ', 'namespace ', '.cs', 'console.write'],
-        php: ['<?php', '<?=', '$_', 'echo ', 'function ', '.php', '->'],
-        ruby: ['def ', 'end', 'class ', '.rb', 'puts ', 'require '],
-        go: ['package ', 'import ', 'func ', 'fmt.', '.go'],
-        rust: ['fn ', 'let ', 'mut ', 'impl ', 'struct ', '.rs'],
-        swift: ['func ', 'var ', 'let ', 'import ', '.swift', 'println'],
-        kotlin: ['fun ', 'val ', 'var ', 'class ', '.kt'],
-        html: ['<html', '<div', '<body', '<head', '</div>', '</body>', '.html'],
-        css: ['{', '}', ':', ';', 'color:', 'background:', '.css', '@media'],
-        sql: ['select ', 'from ', 'where ', 'insert ', 'update ', 'delete ', 'create table'],
-        bash: ['#!/bin/bash', 'echo ', 'cd ', 'ls ', 'grep ', '.sh']
-    };
-    
-    // Check for language-specific patterns
-    for (const [language, patterns] of Object.entries(languagePatterns)) {
-        let languageScore = 0;
-        for (const pattern of patterns) {
-            if (text.includes(pattern.toLowerCase())) {
-                languageScore += 2;
-                codeScore += 1;
-            }
-        }
-        
-        if (languageScore > 4 && languageScore > codeScore - languageScore) {
-            detectedLanguage = language;
-        }
-    }
-    
-    // General code indicators
-    const codeIndicators = [
-        { pattern: /\{[\s\S]*\}/g, weight: 3 }, // Braces
-        { pattern: /\([\s\S]*\)/g, weight: 2 }, // Parentheses
-        { pattern: /;/g, weight: 1 }, // Semicolons
-        { pattern: /\n\s{2,}/g, weight: 2 }, // Indentation
-        { pattern: /\/\*[\s\S]*?\*\//g, weight: 2 }, // Block comments
-        { pattern: /\/\/.*$/gm, weight: 2 }, // Line comments
-        { pattern: /#.*$/gm, weight: 1 }, // Hash comments
-        { pattern: /\[[\s\S]*?\]/g, weight: 2 }, // Brackets
-        { pattern: /=>/g, weight: 2 }, // Arrow functions
-        { pattern: /\w+\(/g, weight: 2 }, // Function calls
-        { pattern: /\w+\.\w+/g, weight: 2 }, // Object properties
-    ];
-    
-    // Check general code patterns
-    for (const { pattern, weight } of codeIndicators) {
-        const matches = content.match(pattern);
-        if (matches) {
-            codeScore += matches.length * weight;
-        }
-    }
-    
-    // Line count bonus for structured content
-    const lines = content.split('\n');
-    if (lines.length > 5) {
-        codeScore += 2;
-    }
-    
-    // Calculate confidence (normalize score)
-    const confidence = Math.min(codeScore / 20, 1); // Scale to 0-1
-    
-    // Determine if it's code (confidence > 0.3)
-    const isCode = confidence > 0.3;
-    
-    return {
-        isCode,
-        confidence,
-        language: detectedLanguage,
-        lineCount: lines.length,
-        charCount: content.length
-    };
-}
-
 function monitorFileUploads(platform) {
     console.log(`🔍 Starting file upload monitoring for ${platform}`);
     
@@ -1081,157 +874,41 @@ function simpleHash(str) {
 // ========== PDF FILE ANALYSIS FUNCTIONS ==========
 function getPDFAnalysisPrompts() {
     return {
-        summarize: [
-            "Please analyze this PDF and create a comprehensive executive summary. Include: (1) Main purpose and scope, (2) Key findings or arguments, (3) Supporting evidence or data points, (4) Conclusions and implications, (5) Any recommendations or next steps mentioned. Structure with clear headings and bullet points for executive-level consumption.",
-            
-            "Break down this PDF document into a clear, structured summary. Focus on: the core message, most important details, critical insights, and actionable takeaways. Use a hierarchical format with main points and sub-points. Make it scannable for someone who needs to quickly understand the document's value.",
-            
-            "Create a detailed summary of this PDF that captures the essential information. Organize by: document overview, main themes, supporting details, key statistics or data mentioned, and practical implications. Write in a professional tone suitable for sharing with colleagues or stakeholders."
-        ],
+        summarize: 'Analyze this PDF and create a comprehensive summary. Start with the document\'s main purpose and scope. Then extract the key findings, arguments, and supporting evidence. Include any conclusions, implications, and recommendations mentioned. Structure your response with clear headings and bullet points for easy scanning. Focus on information that would be valuable for decision-making.',
         
-        extract_key_points: [
-            "Extract the 8-10 most important key points from this PDF. For each point, provide: the main concept, supporting details, and why it matters. Format as a numbered list with brief explanations. Prioritize information that would be most valuable for decision-making or further research.",
-            
-            "Identify and list the crucial insights from this PDF document. Present each key point with: a clear headline, 2-3 sentences of explanation, and relevance to the overall topic. Focus on information that someone would highlight or bookmark for future reference.",
-            
-            "Analyze this PDF and distill it into essential key points. Structure each point with: the core concept, context within the document, and practical significance. Aim for 8-12 points that capture the document's most valuable information in an easily digestible format."
-        ],
+        extract_key_points: 'Extract the 8-10 most important key points from this PDF. For each point, provide a clear headline and 2-3 sentences of explanation. Focus on insights that would be most valuable for decision-making or further research. Present as a numbered list with brief explanations of why each point matters.',
         
-        highlight_action_items: [
-            "Scan this PDF for actionable items and recommendations. Extract: specific tasks mentioned, implementation steps, deadlines or timelines, responsible parties (if mentioned), and measurable outcomes. Format as a prioritized action list with context for each item.",
-            
-            "Identify all action-oriented content in this PDF. Look for: explicit recommendations, suggested next steps, implementation guidelines, best practices to adopt, and measurable goals. Present as a structured action plan with clear, executable items.",
-            
-            "Extract actionable insights and recommendations from this PDF. Focus on: what should be done, how to do it, when to do it (if specified), and expected results. Organize by priority level and include any prerequisites or dependencies mentioned."
-        ],
+        highlight_action_items: 'Scan this PDF for actionable items and recommendations. Extract specific tasks, implementation steps, deadlines or timelines, and measurable outcomes mentioned. Present as a prioritized action list with context for each item. If no explicit actions are mentioned, suggest practical next steps based on the document\'s content.',
         
-        all_above: [
-            "Provide a comprehensive analysis of this PDF including: (1) Executive Summary with main points, (2) Key Insights with detailed explanations, (3) Action Items with implementation steps, and (4) Overall Assessment with recommendations. Structure with clear sections and bullet points for maximum usability.",
-            
-            "Complete analysis of this PDF document: Begin with a concise summary, then extract key findings with context, identify actionable recommendations, and conclude with implementation priorities. Format for easy scanning with headers, bullet points, and numbered lists where appropriate.",
-            
-            "Full document analysis including: Summary of main themes and conclusions, Critical insights with supporting evidence, Actionable recommendations with priority levels, and Strategic implications for implementation. Present in a structured format suitable for executive briefing or project planning."
-        ]
+        all_above: 'Provide a comprehensive PDF analysis with four detailed sections: (1) Executive Summary - document purpose, main findings, key arguments, supporting evidence, and overall conclusions, (2) Critical Insights - extract 8-10 key points with explanations and relevance to decision-making, (3) Action Plan - specific actionable items, implementation steps, timelines, and suggested next steps, (4) Strategic Assessment - business implications, risks, opportunities, and recommendations for stakeholders. Format each section with clear headings, bullet points, and prioritized information for executive consumption.'
     };
 }
 
 function getExcelAnalysisPrompts() {
     return {
-        data_analysis_summary: [
-            "Analyze this Excel spreadsheet and provide a comprehensive data overview. Include: (1) Dataset structure and column descriptions, (2) Key statistical summaries and trends, (3) Notable patterns, outliers, or anomalies, (4) Data quality assessment (missing values, duplicates), (5) Initial insights and observations. Structure with clear headings and highlight the most significant findings.",
-            
-            "Examine this Excel file and create a detailed data analysis summary. Focus on: dataset composition, statistical distributions, temporal trends (if applicable), categorical breakdowns, correlation patterns, and data integrity issues. Present findings in a structured format with actionable insights for further analysis.",
-            
-            "Provide a thorough analysis of this Excel data including: data structure overview, descriptive statistics for key metrics, trend identification across time periods or categories, outlier detection, missing data assessment, and preliminary insights. Format as an executive summary with bullet points for key findings."
-        ],
+        data_analysis_summary: 'Analyze this Excel file and provide a structured data summary. First, describe the dataset structure (columns, data types, row count). Then provide key statistics for numerical columns (mean, median, min, max). Identify any missing values, duplicates, or data quality issues. Finally, highlight the 3 most important insights or patterns you notice. Format your response with clear headings for easy scanning.',
         
-        generate_formulas: [
-            "Based on the structure and content of this Excel file, generate useful formulas that would enhance data analysis. Include: (1) Summary formulas (SUM, AVERAGE, COUNT variations), (2) Conditional formulas (IF, SUMIF, COUNTIF), (3) Lookup formulas (VLOOKUP, INDEX-MATCH), (4) Date/time calculations, (5) Data validation formulas. Provide the exact formula syntax with explanations for each.",
-            
-            "Create a comprehensive set of Excel formulas tailored to this dataset. Focus on: aggregation formulas for totals and averages, conditional logic for data categorization, lookup functions for data relationships, statistical formulas for analysis, and dynamic formulas for ongoing calculations. Include cell references and step-by-step implementation guidance.",
-            
-            "Generate practical Excel formulas optimized for this data structure. Provide: calculation formulas for key metrics, conditional formulas for data filtering and categorization, advanced lookup formulas for cross-referencing, time-based calculations for trends, and data validation formulas. Each formula should include syntax, purpose, and implementation instructions."
-        ],
+        generate_formulas: 'Based on this Excel data, create useful formulas to enhance my analysis. Provide 5-8 practical formulas including: summary calculations (SUM, AVERAGE, COUNT), conditional formulas (IF, SUMIF, COUNTIF), and lookup formulas (VLOOKUP or INDEX-MATCH). For each formula, give me the exact syntax, explain what it does, and tell me which cells to place it in. Make sure the formulas are ready to copy-paste.',
         
-        business_intelligence_visuals: [
-            "Transform this Excel data into actionable business intelligence with visualization recommendations. Include: (1) Key performance indicators and metrics extraction, (2) Strategic insights and business implications, (3) Recommended chart types (bar, line, pie, scatter plots), (4) Dashboard layout suggestions, (5) Data storytelling approach. Focus on turning numbers into business decisions.",
-            
-            "Analyze this Excel file for business intelligence opportunities and create visualization strategy. Provide: executive summary of business insights, KPI identification and benchmarking, trend analysis with strategic implications, recommended visualization types for each data dimension, and dashboard wireframe suggestions. Emphasize actionable business outcomes.",
-            
-            "Convert this Excel data into comprehensive business intelligence insights with visual presentation plans. Focus on: business performance analysis, competitive insights (if applicable), operational efficiency metrics, growth opportunities identification, risk assessment indicators, and detailed visualization recommendations including chart types, color schemes, and dashboard organization."
-        ],
+        business_intelligence_visuals: 'Transform this Excel data into actionable business intelligence. Identify the key performance indicators and metrics from this data. Recommend specific chart types (bar, line, pie, scatter) for different data dimensions and explain why each chart type fits. Suggest a dashboard layout with 4-6 key visualizations. Include insights about trends, patterns, and business implications. Focus on turning this data into strategic decisions.',
         
-        all_above: [
-            "Provide complete Excel file analysis including: (1) Comprehensive Data Summary with structure, statistics, and quality assessment, (2) Custom Excel Formulas tailored to your data needs, (3) Business Intelligence Insights with strategic recommendations, (4) Data Visualization Strategy with specific chart recommendations and dashboard layout. Structure as a comprehensive report with implementation guidance.",
-            
-            "Full Excel analysis package: Begin with detailed data overview including structure and key statistics, generate practical formulas for enhanced calculations and analysis, extract business intelligence insights with strategic implications, and conclude with comprehensive visualization recommendations. Format for immediate implementation with step-by-step guidance.",
-            
-            "Complete Excel file transformation analysis: Data structure and quality assessment with statistical summary, custom formula generation for automated calculations, business intelligence extraction with actionable insights, and visualization strategy with dashboard design recommendations. Present as a comprehensive guide for data optimization and business decision-making."
-        ]
+        all_above: 'Provide a complete Excel analysis package: (1) Data structure overview with statistics and quality assessment, (2) 5-8 practical formulas with exact syntax and placement instructions, (3) Business intelligence insights with specific visualization recommendations and dashboard design. Structure as a comprehensive report with clear sections and actionable next steps for implementation.'
     };
 }
 
 function getImageAnalysisPrompts() {
     return {
-        analyze_describe: [
-            "Analyze this image in comprehensive detail. Provide: (1) Detailed visual description including all objects, people, and elements, (2) Technical analysis of composition, lighting, and style, (3) Color palette and visual mood assessment, (4) Context and setting identification, (5) Any notable artistic or photographic techniques used. Structure your analysis with clear sections and highlight the most significant visual elements.",
-            
-            "Examine this image thoroughly and provide a complete visual analysis. Include: scene composition and layout, identification of all visible elements and subjects, lighting conditions and photographic style, color scheme and visual aesthetics, emotional tone and mood conveyed, technical quality assessment, and contextual information about the setting or theme.",
-            
-            "Provide an in-depth analysis of this image covering: comprehensive description of all visible content, artistic and technical elements (composition, perspective, lighting), style identification and visual characteristics, color analysis and aesthetic mood, cultural or contextual significance, and overall visual impact assessment. Format as a structured analysis suitable for detailed understanding."
-        ],
+        analyze_describe: 'Analyze this image in comprehensive detail. Provide a detailed visual description including all objects, people, and elements you can identify. Describe the composition, lighting, colors, and overall mood. Identify the context and setting. Note any text, symbols, or important details. Include technical observations about image quality, style, and photographic techniques used. Structure your analysis with clear sections for easy reading.',
         
-        extract_text_ocr: [
-            "Extract and transcribe all visible text from this image using OCR analysis. Provide: (1) Complete text transcription in reading order, (2) Text formatting and structure preservation, (3) Identification of different text elements (headings, body text, captions), (4) Location context for each text element, (5) Any partially visible or unclear text with best-effort interpretation. Format the extracted text clearly with proper structure and hierarchy.",
-            
-            "Perform comprehensive text extraction from this image. Include: full transcription of all readable text, preservation of original formatting and layout structure, categorization of text types (titles, paragraphs, lists, labels), indication of text positioning and context, handling of multiple languages if present, and notation of any unclear or partially obscured text with reasonable interpretations.",
-            
-            "Analyze this image for text content and provide complete OCR results. Focus on: accurate transcription of all visible text elements, maintaining original document structure and formatting, identifying different text categories and their purposes, noting text placement and visual hierarchy, extracting data from tables or structured content, and providing context for how text relates to visual elements."
-        ],
+        extract_text_ocr: 'Extract and transcribe all visible text from this image using OCR analysis. Provide the complete text transcription in reading order, preserving original formatting and structure where possible. Identify different text elements (headings, body text, captions, labels). Note the location context for each text section. If any text is partially visible or unclear, provide your best interpretation and mark it as uncertain. Format the extracted text clearly with proper hierarchy.',
         
-        generate_ai_prompts: [
-            "Create detailed AI image generation prompts to recreate this image's style and content. Include: (1) Comprehensive scene description for image generators, (2) Specific style and artistic technique keywords, (3) Technical parameters (lighting, composition, perspective), (4) Color palette and mood descriptors, (5) Quality and detail modifiers for optimal AI generation. Format as ready-to-use prompts for Midjourney, DALL-E, or Stable Diffusion.",
-            
-            "Generate AI image prompts that capture this image's essence and style. Provide: detailed subject and scene descriptions, artistic style and technique specifications, lighting and atmosphere keywords, color scheme and visual mood terms, composition and framing instructions, quality enhancers and negative prompts, and platform-specific optimizations for different AI image generators.",
-            
-            "Analyze this image and create comprehensive AI generation prompts for recreation. Focus on: precise visual element descriptions, artistic style identification and keywords, technical photography/art terms, mood and atmosphere descriptors, composition and perspective details, color and lighting specifications, and format as multiple prompt variations optimized for different AI image generation platforms."
-        ],
+        generate_ai_prompts: 'Create detailed AI image generation prompts to recreate this image\'s style and content. Provide 3-4 different prompt variations optimized for AI image generators like Midjourney, DALL-E, or Stable Diffusion. Include comprehensive scene descriptions, artistic style keywords, technical parameters (lighting, composition, perspective), color palette descriptors, and quality modifiers. Each prompt should be ready to use and capture the essence of this image for recreation.',
         
-        all_above: [
-            "Provide complete image analysis including: (1) Comprehensive Visual Analysis with detailed descriptions and technical assessment, (2) OCR Text Extraction with full transcription and formatting, (3) AI Image Generation Prompts for recreating this style, and (4) Overall Assessment with key insights and applications. Structure as a comprehensive report covering all aspects of image understanding and utilization.",
-            
-            "Full image analysis package: Begin with detailed visual description and technical analysis, extract and transcribe all visible text with proper formatting, generate AI prompts for image recreation and style matching, and conclude with comprehensive insights and practical applications. Format for maximum utility across different use cases and platforms.",
-            
-            "Complete image processing analysis: Visual content analysis with artistic and technical evaluation, comprehensive text extraction and OCR processing, AI generation prompt creation for style replication, and integrated assessment with actionable insights. Present as a structured guide for complete image understanding and practical application."
-        ]
+        all_above: 'Provide complete image analysis including: (1) Comprehensive Visual Analysis - detailed description of all elements, composition, lighting, style, and technical aspects, (2) OCR Text Extraction - complete transcription of all visible text with formatting and context, (3) AI Generation Prompts - 3-4 ready-to-use prompts for recreating this image style in AI generators, (4) Overall Assessment - key insights about the image\'s purpose, quality, and potential applications. Structure each section clearly for maximum utility.'
     };
 }
 
-function getCodeAnalysisPrompts() {
-    return {
-        debug_fix_errors: [
-            "Analyze this code for bugs, errors, and potential issues. Provide: (1) Identification of syntax errors, logical errors, and runtime issues, (2) Specific line-by-line error explanations, (3) Corrected code with fixes implemented, (4) Potential edge cases and vulnerabilities, (5) Error handling improvements and best practices. Format with clear problem descriptions and working solutions.",
-            
-            "Perform comprehensive debugging analysis on this code. Include: detailed error detection and classification, root cause analysis for each issue found, step-by-step fixing instructions with corrected code snippets, testing recommendations to prevent similar issues, and defensive programming suggestions. Present findings in a structured debugging report.",
-            
-            "Debug and troubleshoot this code systematically. Focus on: syntax validation and error correction, logic flow analysis and bug identification, exception handling improvements, performance bottlenecks and memory issues, security vulnerabilities assessment, and provide clean, working code with all issues resolved."
-        ],
-        
-        optimize_document: [
-            "Optimize this code for performance and add comprehensive documentation. Include: (1) Performance analysis with bottleneck identification, (2) Optimized code with efficiency improvements, (3) Inline comments explaining complex logic, (4) Function/method documentation with parameters and return values, (5) Overall code architecture improvements. Focus on maintainability and performance gains.",
-            
-            "Enhance code performance and documentation quality. Provide: algorithmic optimizations and efficiency improvements, memory usage optimization and resource management, comprehensive commenting strategy with clear explanations, API documentation with usage examples, code organization and structure improvements, and maintainable coding patterns implementation.",
-            
-            "Refactor code for optimal performance while adding professional documentation. Focus on: execution speed improvements and resource optimization, clean code principles implementation, detailed inline documentation and comments, comprehensive function signatures and descriptions, code readability enhancements, and professional documentation standards following industry best practices."
-        ],
-        
-        convert_language: [
-            "Convert this code to [specify target language] while maintaining functionality. Provide: (1) Complete code translation with equivalent logic, (2) Language-specific best practices implementation, (3) Syntax adaptation and idiom usage, (4) Library/framework equivalent replacements, (5) Comments explaining conversion decisions and differences. Ensure the converted code follows target language conventions.",
-            
-            "Translate this code to another programming language with full functionality preservation. Include: syntactic conversion with proper language constructs, semantic equivalence maintenance across languages, framework and library mappings to target ecosystem, language-specific optimization opportunities, detailed conversion notes explaining design decisions, and usage examples in the target language.",
-            
-            "Port this code to [target language] with professional quality standards. Focus on: accurate functional translation maintaining original behavior, idiomatic language usage and best practices adoption, proper error handling in target language style, efficient use of language-specific features and libraries, comprehensive migration notes with key differences explained, and testing recommendations for the converted code."
-        ],
-        
-        explain_line_by_line: [
-            "Provide a detailed line-by-line explanation of this code. Include: (1) Step-by-step breakdown of each line's purpose, (2) Variable and function explanations with their roles, (3) Logic flow and execution order description, (4) Concepts and algorithms explanation, (5) Learning insights and key takeaways. Format as an educational walkthrough suitable for understanding complex code logic.",
-            
-            "Create a comprehensive educational breakdown of this code. Provide: detailed line-by-line commentary with purpose explanations, variable lifecycle and data flow analysis, function interactions and call sequences, algorithm logic and decision-making processes, design pattern identification and explanations, and learning objectives with skill development insights.",
-            
-            "Explain this code in detail for educational understanding. Focus on: sequential line-by-line analysis with clear explanations, programming concepts and principles demonstration, code structure and organization logic, best practices identification and reasoning, problem-solving approach and methodology, and practical applications with real-world context."
-        ],
-        
-        generate_test_cases: [
-            "Generate comprehensive test cases for this code. Include: (1) Unit tests covering all functions and methods, (2) Edge case testing with boundary conditions, (3) Error handling and exception testing, (4) Integration test scenarios, (5) Performance and load testing suggestions. Provide complete test code with assertions and expected outcomes.",
-            
-            "Create a full testing suite for this code implementation. Provide: systematic unit test coverage with positive and negative cases, boundary testing and edge case validation, mock data and test fixture setup, integration testing strategies and scenarios, automated testing framework recommendations, and test execution and validation procedures.",
-            
-            "Develop thorough test cases and testing strategy for this code. Focus on: comprehensive test coverage with all code paths tested, realistic test data and scenarios creation, error condition testing and validation, performance benchmarking and load testing, continuous integration testing setup, and quality assurance methodology with best practices implementation."
-        ]
-    };
-}
-
-function getContextualizedPrompt(option, filename, fileSize, fileType = 'pdf', codeAnalysis = null) {
+function getContextualizedPrompt(option, filename, fileSize, fileType = 'pdf') {
     let prompts;
     
     // Get appropriate prompt set based on file type
@@ -1239,63 +916,21 @@ function getContextualizedPrompt(option, filename, fileSize, fileType = 'pdf', c
         prompts = getExcelAnalysisPrompts();
     } else if (fileType === 'image') {
         prompts = getImageAnalysisPrompts();
-    } else if (fileType === 'code') {
-        prompts = getCodeAnalysisPrompts();
     } else {
         prompts = getPDFAnalysisPrompts();
     }
     
-    const variations = prompts[option] || (fileType === 'excel' ? prompts.data_analysis_summary : 
-                                         fileType === 'image' ? prompts.analyze_describe : 
-                                         fileType === 'code' ? prompts.debug_fix_errors :
-                                         prompts.summarize);
-    
-    // Simple rotation based on filename/code hash for consistency
-    const hashInput = filename || (codeAnalysis ? codeAnalysis.language + codeAnalysis.lineCount : 'default');
-    const index = Math.abs(simpleHash(hashInput)) % variations.length;
-    let selectedPrompt = variations[index];
+    // Get the single prompt (no more array selection needed)
+    const selectedPrompt = prompts[option] || (fileType === 'excel' ? prompts.data_analysis_summary : 
+                                              fileType === 'image' ? prompts.analyze_describe : 
+                                              prompts.summarize);
     
     // Add contextual elements based on file type
     const filenameLower = (filename || '').toLowerCase();
     let contextualPrefix = "";
     
-    if (fileType === 'code') {
-        // Code-specific contextual prefixes
-        if (codeAnalysis && codeAnalysis.language !== 'unknown') {
-            const languageDisplayNames = {
-                javascript: 'JavaScript',
-                python: 'Python',
-                java: 'Java',
-                cpp: 'C++',
-                csharp: 'C#',
-                php: 'PHP',
-                ruby: 'Ruby',
-                go: 'Go',
-                rust: 'Rust',
-                swift: 'Swift',
-                kotlin: 'Kotlin',
-                html: 'HTML',
-                css: 'CSS',
-                sql: 'SQL',
-                bash: 'Bash/Shell'
-            };
-            const displayName = languageDisplayNames[codeAnalysis.language] || codeAnalysis.language;
-            contextualPrefix = `This appears to be ${displayName} code. `;
-            
-            // Add specific context based on detected patterns
-            if (codeAnalysis.lineCount > 100) {
-                contextualPrefix += "Given the code's length, focus on the most critical aspects. ";
-            } else if (codeAnalysis.lineCount < 20) {
-                contextualPrefix += "This is a concise code snippet. ";
-            }
-        }
-        
-        // Handle convert_language option specifically
-        if (option === 'convert_language') {
-            contextualPrefix += "Please specify the target programming language you want to convert this code to. ";
-        }
-    } else if (fileType === 'image') {
-        // Image-specific contextual prefixes (existing logic)
+    if (fileType === 'image') {
+        // Image-specific contextual prefixes
         if (filenameLower.includes('screenshot') || filenameLower.includes('screen')) {
             contextualPrefix = "This appears to be a screenshot. ";
         } else if (filenameLower.includes('chart') || filenameLower.includes('graph') || filenameLower.includes('data')) {
@@ -1314,7 +949,7 @@ function getContextualizedPrompt(option, filename, fileSize, fileType = 'pdf', c
             contextualPrefix = "This appears to be artwork or creative content. ";
         }
     } else if (fileType === 'excel') {
-        // Excel-specific contextual prefixes (existing logic)
+        // Excel-specific contextual prefixes
         if (filenameLower.includes('sales') || filenameLower.includes('revenue')) {
             contextualPrefix = "This appears to be a sales/revenue dataset. ";
         } else if (filenameLower.includes('finance') || filenameLower.includes('budget') || filenameLower.includes('cost')) {
@@ -1331,7 +966,7 @@ function getContextualizedPrompt(option, filename, fileSize, fileType = 'pdf', c
             contextualPrefix = "This appears to be a business reporting dataset. ";
         }
     } else {
-        // PDF-specific contextual prefixes (existing logic)
+        // PDF-specific contextual prefixes
         if (filenameLower.includes('report') || filenameLower.includes('analysis')) {
             contextualPrefix = "This appears to be a business/analytical document. ";
         } else if (filenameLower.includes('research') || filenameLower.includes('paper') || filenameLower.includes('study')) {
@@ -1850,187 +1485,6 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
     console.log('📱 Image analysis notification displayed');
 }
 
-function showCodeAnalysisNotification(codeAnalysis, contentLength, platform) {
-    // Remove any existing file analysis notification
-    if (codeAnalysisNotification) {
-        codeAnalysisNotification.remove();
-        codeAnalysisNotification = null;
-    }
-    
-    // Create notification popup
-    const notification = document.createElement('div');
-    notification.className = 'code-analysis-notification';
-    notification.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #2c2c2c;
-        color: white;
-        padding: 16px;
-        border-radius: 10px;
-        font-size: 13px;
-        width: 320px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        border: 2px solid rgba(30,144,255,0.4);
-        z-index: 10003;
-        animation: codeAnalysisSlide 0.4s ease-out;
-        pointer-events: auto;
-    `;
-    
-    const languageDisplay = codeAnalysis.language !== 'unknown' ? 
-        codeAnalysis.language.charAt(0).toUpperCase() + codeAnalysis.language.slice(1) : 'Code';
-    const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
-    
-    notification.innerHTML = `
-        <div style="margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <div style="width: 8px; height: 8px; background: #1e90ff; border-radius: 50%; animation: pulse 1.5s infinite;"></div>
-                <span style="font-weight: 500; color: #1e90ff;">💻 Code Analysis Ready</span>
-            </div>
-            <div style="font-size: 11px; color: rgba(255,255,255,0.7); margin-bottom: 10px;">
-                Detected: <span style="color: #1e90ff;">${languageDisplay}</span> • ${codeAnalysis.lineCount} lines • ${Math.round(codeAnalysis.confidence * 100)}% confidence
-            </div>
-            <div style="font-size: 11px; color: rgba(255,255,255,0.8); margin-bottom: 12px;">
-                Choose your analysis approach:
-            </div>
-        </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
-            <button class="code-option-btn" data-option="debug_fix_errors" style="
-                background: rgba(30,144,255,0.1);
-                border: 1px solid rgba(30,144,255,0.3);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 5px;
-                font-size: 11px;
-                cursor: pointer;
-                text-align: left;
-                transition: all 0.2s ease;
-            ">🐛 Debug & Fix Errors</button>
-            
-            <button class="code-option-btn" data-option="optimize_document" style="
-                background: rgba(30,144,255,0.1);
-                border: 1px solid rgba(30,144,255,0.3);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 5px;
-                font-size: 11px;
-                cursor: pointer;
-                text-align: left;
-                transition: all 0.2s ease;
-            ">⚡ Optimize & Document</button>
-            
-            <button class="code-option-btn" data-option="convert_language" style="
-                background: rgba(30,144,255,0.1);
-                border: 1px solid rgba(30,144,255,0.3);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 5px;
-                font-size: 11px;
-                cursor: pointer;
-                text-align: left;
-                transition: all 0.2s ease;
-            ">🔄 Convert to Another Language</button>
-            
-            <button class="code-option-btn" data-option="explain_line_by_line" style="
-                background: rgba(30,144,255,0.1);
-                border: 1px solid rgba(30,144,255,0.3);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 5px;
-                font-size: 11px;
-                cursor: pointer;
-                text-align: left;
-                transition: all 0.2s ease;
-            ">📖 Explain Line by Line</button>
-            
-            <button class="code-option-btn" data-option="generate_test_cases" style="
-                background: rgba(30,144,255,0.1);
-                border: 1px solid rgba(30,144,255,0.3);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 5px;
-                font-size: 11px;
-                cursor: pointer;
-                text-align: left;
-                transition: all 0.2s ease;
-            ">🧪 Generate Test Cases</button>
-        </div>
-        
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button class="code-dismiss-btn" style="
-                background: none;
-                border: 1px solid rgba(255,255,255,0.3);
-                color: rgba(255,255,255,0.8);
-                padding: 6px 12px;
-                border-radius: 5px;
-                font-size: 11px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            ">Dismiss</button>
-        </div>
-    `;
-    
-    // Add CSS animation if not already present
-    if (!shadowRoot.querySelector('#code-analysis-styles')) {
-        const style = document.createElement('style');
-        style.id = 'code-analysis-styles';
-        style.textContent = `
-            @keyframes codeAnalysisSlide {
-                from { 
-                    transform: translateY(20px) scale(0.95); 
-                    opacity: 0; 
-                }
-                to { 
-                    transform: translateY(0) scale(1); 
-                    opacity: 1; 
-                }
-            }
-            .code-option-btn:hover {
-                background: rgba(30,144,255,0.2) !important;
-                border-color: rgba(30,144,255,0.5) !important;
-                transform: translateY(-1px);
-            }
-            .code-dismiss-btn:hover {
-                background: rgba(255,255,255,0.1) !important;
-                border-color: rgba(255,255,255,0.5) !important;
-            }
-        `;
-        shadowRoot.appendChild(style);
-    }
-    
-    // Event handlers for Code option buttons
-    notification.querySelectorAll('.code-option-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const option = btn.getAttribute('data-option');
-            handleCodeOptionSelection(option, codeAnalysis, contentLength, platform);
-            notification.remove();
-            codeAnalysisNotification = null;
-        });
-    });
-    
-    // Dismiss button handler
-    notification.querySelector('.code-dismiss-btn').addEventListener('click', () => {
-        notification.remove();
-        codeAnalysisNotification = null;
-    });
-    
-    // Add to extension button
-    extensionButton.appendChild(notification);
-    codeAnalysisNotification = notification;
-    
-    // Auto-dismiss after 30 seconds
-    setTimeout(() => {
-        if (codeAnalysisNotification === notification) {
-            notification.remove();
-            codeAnalysisNotification = null;
-        }
-    }, 30000);
-    
-    console.log('📱 Code analysis notification displayed');
-}
-
 async function handlePDFOptionSelection(option, filename, fileSize, platform) {
     console.log('📝 PDF option selected:', option, 'for file:', filename);
     
@@ -2117,35 +1571,6 @@ async function handleImageOptionSelection(option, filename, fileSize, platform) 
         }
     }
 }
-
-async function handleCodeOptionSelection(option, codeAnalysis, contentLength, platform) {
-    console.log('💻 Code option selected:', option, 'for', codeAnalysis.language, 'code');
-    
-    try {
-        // Generate contextual prompt for Code
-        const prompt = getContextualizedPrompt(option, null, contentLength, 'code', codeAnalysis);
-        console.log('✅ Generated Code prompt for', option);
-        console.log('📝 Prompt preview:', prompt.substring(0, 100) + '...');
-        
-        // Insert prompt into input field
-        await insertFileAnalysisPrompt(prompt, platform, 'code');
-        
-        console.log('🎯 Code analysis prompt ready for user to send');
-        
-    } catch (error) {
-        console.error('❌ Code option selection error:', error);
-        // Show error in a simple way
-        const errorMsg = 'Failed to process Code analysis option: ' + error.message;
-        console.log('❌', errorMsg);
-        
-        // Try to show error in output if available
-        if (shadowRoot && shadowRoot.querySelector('#output-text')) {
-            const outputText = shadowRoot.querySelector('#output-text');
-            outputText.classList.add('error');
-            outputText.textContent = errorMsg;
-        }
-    }
- }
 
  async function insertFileAnalysisPrompt(prompt, platform, fileType = 'pdf') {
     console.log(`📝 Inserting ${fileType.toUpperCase()} analysis prompt into input field...`);
@@ -4958,8 +4383,6 @@ setTimeout(() => {
         console.log('📄 Initializing File Analysis (PDF, Excel & Images)...');
         initializeFileAnalysis();
         
-        console.log('💻 Initializing Code Analysis...');
-        initializeCodeAnalysis();
     }
 }, 2000);
 
@@ -4974,8 +4397,6 @@ setInterval(() => {
         if (fileAnalysisEnabled) {
             console.log('🔄 File Analysis monitoring active (PDF, Excel & Images)...');
         }
-        if (codeAnalysisEnabled) {
-            console.log('🔄 Code Analysis monitoring active...');
-        }
+        
     }
 }, 5000); // Reduced frequency to 5 seconds
