@@ -1802,6 +1802,47 @@ async function handleMagicPillClick(e) {
     
     console.log('🚀 Processing text with magic pill:', text.substring(0, 50) + '...');
     
+    // ✅ NEW: Check login/credits BEFORE processing
+    const creditCheck = await checkCredits('magic_pill_enhance');
+    if (!creditCheck.success) {
+        console.log('❌ Magic pill credit check failed:', creditCheck.message);
+        
+        // ✅ FIX: Temporarily show button to get correct positioning
+        const wasHidden = button.style.display === 'none';
+        if (wasHidden) {
+            button.style.display = 'block';
+        }
+        
+        // NOW get the correct button position (bottom-right corner)
+        const buttonRect = button.getBoundingClientRect();
+        
+        // Show container at correct position
+        solthronContainer.style.display = 'block';
+        solthronContainer.style.pointerEvents = 'auto';
+        positionContainer(buttonRect);
+        
+        // Hide button again if it was originally hidden
+        if (wasHidden) {
+            button.style.display = 'none';
+        }
+        
+        // Show error and login prompt
+        showError(creditCheck.message || "Please login to use this feature");
+        
+        // Auto-open profile view for direct login access
+        closeAllSections();
+        const profileView = shadowRoot.getElementById('profile-view');
+        const profileBtn = shadowRoot.getElementById('profile-btn');
+        const outputContainer = shadowRoot.querySelector('.output-container');
+        
+        profileView.style.display = 'block';
+        outputContainer.style.display = 'none';
+        profileBtn.querySelector('svg').style.stroke = '#00ff00';
+        
+        return;
+    }
+    
+    // ✅ EXISTING: Continue with magic pill processing if logged in
     // Animation
     const originalHTML = magicPillIcon.innerHTML;
     magicPillIcon.innerHTML = `
@@ -1811,7 +1852,7 @@ async function handleMagicPillClick(e) {
     `;
     
     try {
-        // Send request to new magic pill endpoint
+        // Send request to magic pill endpoint
         const requestData = {
             type: 'magic_pill_enhance',
             data: {
