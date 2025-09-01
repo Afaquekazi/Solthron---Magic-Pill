@@ -1802,47 +1802,78 @@ async function handleMagicPillClick(e) {
     
     console.log('🚀 Processing text with magic pill:', text.substring(0, 50) + '...');
     
-    // ✅ NEW: Check login/credits BEFORE processing
-    const creditCheck = await checkCredits('magic_pill_enhance');
+    // ✅ ENHANCED: Check credits with warnings
+    const creditCheck = await checkCreditsWithWarnings('magic_pill_enhance');
+    
+    // ❌ INSUFFICIENT CREDITS - Show login/upgrade prompt
     if (!creditCheck.success) {
         console.log('❌ Magic pill credit check failed:', creditCheck.message);
         
-        // ✅ FIX: Temporarily show button to get correct positioning
         const wasHidden = button.style.display === 'none';
         if (wasHidden) {
             button.style.display = 'block';
         }
         
-        // NOW get the correct button position (bottom-right corner)
         const buttonRect = button.getBoundingClientRect();
-        
-        // Show container at correct position
         solthronContainer.style.display = 'block';
         solthronContainer.style.pointerEvents = 'auto';
         positionContainer(buttonRect);
         
-        // Hide button again if it was originally hidden
         if (wasHidden) {
             button.style.display = 'none';
         }
         
-        // Show error and login prompt
-        showError(creditCheck.message || "Please login to use this feature");
-        
-        // Auto-open profile view for direct login access
-        closeAllSections();
-        const profileView = shadowRoot.getElementById('profile-view');
-        const profileBtn = shadowRoot.getElementById('profile-btn');
-        const outputContainer = shadowRoot.querySelector('.output-container');
-        
-        profileView.style.display = 'block';
-        outputContainer.style.display = 'none';
-        profileBtn.querySelector('svg').style.stroke = '#00ff00';
+        if (creditCheck.showUpgrade) {
+            // Show upgrade prompt instead of login
+            showError(creditCheck.message + ' Click "Get More Credits" to purchase.');
+            // Could show upgrade-specific UI here
+        } else {
+            // Show login prompt
+            showError(creditCheck.message || "Please login to use this feature");
+            closeAllSections();
+            const profileView = shadowRoot.getElementById('profile-view');
+            const profileBtn = shadowRoot.getElementById('profile-btn');
+            const outputContainer = shadowRoot.querySelector('.output-container');
+            
+            profileView.style.display = 'block';
+            outputContainer.style.display = 'none';
+            profileBtn.querySelector('svg').style.stroke = '#00ff00';
+        }
         
         return;
     }
     
-    // ✅ EXISTING: Continue with magic pill processing if logged in
+    // ⚠️ LOW CREDITS WARNING - Show warning but allow to proceed
+    if (creditCheck.showWarning) {
+        console.log('⚠️ Magic pill low credits warning:', creditCheck.warningMessage);
+        
+        const creditsAfter = creditCheck.availableCredits - creditCheck.requiredCredits;
+        showLowCreditWarning(creditCheck.warningMessage, creditsAfter);
+        
+        // Wait for user decision
+        const checkUserDecision = () => {
+            if (window.solthronProceedWithLowCredits === true) {
+                window.solthronProceedWithLowCredits = null; // Reset
+                proceedWithMagicPill(text); // Continue with magic pill
+            } else if (window.solthronProceedWithLowCredits === false) {
+                window.solthronProceedWithLowCredits = null; // Reset
+                // User cancelled, do nothing
+            } else {
+                // Still waiting for decision, check again
+                setTimeout(checkUserDecision, 100);
+            }
+        };
+        
+        checkUserDecision();
+        return;
+    }
+    
+    // ✅ SUFFICIENT CREDITS - Proceed normally
+    proceedWithMagicPill(text);
+}
+
+// Extract magic pill processing logic
+async function proceedWithMagicPill(text) {
     // Animation
     const originalHTML = magicPillIcon.innerHTML;
     magicPillIcon.innerHTML = `
@@ -2366,7 +2397,8 @@ function extractConversation() {
     return conversation || 'Unable to extract conversation from this page.';
 }
 
-async function checkCredits(mode) {
+// Enhanced credit checking with container-based warnings
+async function checkCreditsWithWarnings(mode) {
     try {
         const requiredCredits = getFeatureCredits(mode);
         
@@ -2383,13 +2415,31 @@ async function checkCredits(mode) {
             pageCredits = await BackendAuth.getUserCredits();
         }
         
+        // ❌ INSUFFICIENT CREDITS - Block action
         if (pageCredits < requiredCredits) {
             return { 
                 success: false, 
-                message: `Insufficient credits. This feature requires ${requiredCredits} credits, but you have ${pageCredits}.` 
+                message: `Insufficient credits. This feature requires ${requiredCredits} credits, but you have ${pageCredits}.`,
+                showUpgrade: true
             };
         }
         
+        // ⚠️ LOW CREDIT WARNING - Allow action but warn user
+        const creditsAfterAction = pageCredits - requiredCredits;
+        
+        if (creditsAfterAction <= 5) {
+            return {
+                success: true,
+                requiredCredits: requiredCredits,
+                availableCredits: pageCredits,
+                showWarning: true,
+                warningMessage: creditsAfterAction === 0 ? 
+                    `This will use your final credit! You'll have 0 credits left after this action.` :
+                    `Low credits warning: You'll have ${creditsAfterAction} credits left after this action.`
+            };
+        }
+        
+        // ✅ SUFFICIENT CREDITS - Proceed normally
         return { 
             success: true, 
             requiredCredits: requiredCredits,
@@ -2398,8 +2448,132 @@ async function checkCredits(mode) {
         
     } catch (error) {
         console.error('Credit check error:', error);
-        return { success: true };
+        return { success: true }; // Fallback allows usage
     }
+}
+
+// Keep the simple wrapper for backward compatibility
+async function checkCredits(mode) {
+    return await checkCreditsWithWarnings(mode);
+}
+
+// Show low credit warning in container
+function showLowCreditWarning(warningMessage, creditsAfter) {
+    // Force show container (same logic as login)
+    const wasHidden = button.style.display === 'none';
+    if (wasHidden) {
+        button.style.display = 'block';
+    }
+    
+    const buttonRect = button.getBoundingClientRect();
+    solthronContainer.style.display = 'block';
+    solthronContainer.style.pointerEvents = 'auto';
+    positionContainer(buttonRect);
+    
+    if (wasHidden) {
+        button.style.display = 'none';
+    }
+    
+    // Show warning view in container
+    closeAllSections();
+    const outputContainer = shadowRoot.querySelector('.output-container');
+    outputContainer.style.display = 'block';
+    
+    // Create warning content
+    outputText.classList.remove('placeholder', 'shimmer-loading');
+    outputText.classList.add('credit-warning');
+    
+    const isLastCredit = creditsAfter === 0;
+    const warningColor = isLastCredit ? '#ff6b6b' : '#ffa500';
+    const warningIcon = isLastCredit ? '🔥' : '⚠️';
+    
+    outputText.innerHTML = `
+        <div style="
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid ${warningColor};
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            text-align: center;
+        ">
+            <div style="
+                font-size: 18px;
+                margin-bottom: 8px;
+            ">${warningIcon}</div>
+            <div style="
+                color: ${warningColor};
+                font-weight: 500;
+                font-size: 14px;
+                margin-bottom: 8px;
+            ">${isLastCredit ? 'Final Credit Warning!' : 'Low Credits Warning'}</div>
+            <div style="
+                color: rgba(255, 255, 255, 0.9);
+                font-size: 13px;
+                line-height: 1.4;
+            ">${warningMessage}</div>
+        </div>
+        
+        <div style="
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        ">
+            <button id="proceed-action" style="
+                background: rgba(0, 255, 0, 0.1);
+                border: 1px solid rgba(0, 255, 0, 0.3);
+                color: #00ff00;
+                padding: 8px 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s ease;
+            ">Continue with Action</button>
+            
+            <button id="get-credits" style="
+                background: rgba(255, 215, 0, 0.1);
+                border: 1px solid rgba(255, 215, 0, 0.3);
+                color: #ffd700;
+                padding: 8px 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s ease;
+            ">Get More Credits</button>
+            
+            <button id="cancel-action" style="
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.8);
+                padding: 6px 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: all 0.2s ease;
+            ">Cancel</button>
+        </div>
+    `;
+    
+    // Add event listeners for buttons
+    shadowRoot.getElementById('proceed-action').addEventListener('click', () => {
+        // Close container and proceed with original action
+        solthronContainer.style.display = 'none';
+        solthronContainer.style.pointerEvents = 'none';
+        // Return true to indicate user wants to proceed
+        window.solthronProceedWithLowCredits = true;
+    });
+    
+    shadowRoot.getElementById('get-credits').addEventListener('click', () => {
+        // Open credits purchase page
+        window.open('https://solthron.com/credits', '_blank');
+    });
+    
+    shadowRoot.getElementById('cancel-action').addEventListener('click', () => {
+        // Close container and cancel action
+        solthronContainer.style.display = 'none';
+        solthronContainer.style.pointerEvents = 'none';
+        window.solthronProceedWithLowCredits = false;
+    });
 }
 
 // Display functions
@@ -2822,6 +2996,31 @@ function createUI() {
             color: #ff6b6b;
             border: 1px solid rgba(255, 107, 107, 0.3);
         }
+        
+        .output-text.credit-warning {
+    background: #2a2a2a;
+    color: #fff;
+    border: none;
+}
+
+.output-text.credit-warning button:hover {
+    transform: translateY(-1px);
+}
+
+.output-text.credit-warning #proceed-action:hover {
+    background: rgba(0, 255, 0, 0.2) !important;
+    border-color: rgba(0, 255, 0, 0.5) !important;
+}
+
+.output-text.credit-warning #get-credits:hover {
+    background: rgba(255, 215, 0, 0.2) !important;
+    border-color: rgba(255, 215, 0, 0.5) !important;
+}
+
+.output-text.credit-warning #cancel-action:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
 
         .output-text::-webkit-scrollbar {
             width: 6px;
@@ -3216,6 +3415,31 @@ function createUI() {
             color: #ffff00;
             font-weight: 500;
             font-size: 16px;
+        }
+
+        .field-value-with-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .buy-credits-btn {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            color: #ffd700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .buy-credits-btn:hover {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: rgba(255, 215, 0, 0.5);
+            transform: translateY(-1px);
         }
 
         .login-prompt {
@@ -4128,12 +4352,19 @@ function initializeProfileHandlers() {
                         </div>
                         <div class="profile-field credits">
                             <div class="field-label">Available Credits</div>
-                            <div class="field-value">${credits}</div>
+                            <div class="field-value-with-button">
+                                <div class="field-value">${credits}</div>
+                                <button class="buy-credits-btn" id="buy-credits-btn">Buy Credits</button>
+                            </div>
                         </div>
                     </div>
                     <button class="logout-button" id="logout-btn">Logout</button>
                 `;
                 
+                shadowRoot.getElementById('buy-credits-btn').addEventListener('click', () => {
+                    window.open('https://www.solthron.com/subscription', '_blank');
+                });
+
                 shadowRoot.getElementById('logout-btn').addEventListener('click', async () => {
                     try {
                         await BackendAuth.logout();
@@ -4146,19 +4377,28 @@ function initializeProfileHandlers() {
             } catch (error) {
                 console.error('Error loading profile:', error);
                 profileDetails.innerHTML = `
-                    <div class="profile-info">
-                        <div class="profile-field">
-                            <div class="field-label">Status</div>
-                            <div class="field-value">Logged In</div>
-                        </div>
-                        <div class="profile-field">
-                            <div class="field-label">Account</div>
-                            <div class="field-value">Error loading profile data</div>
-                        </div>
-                    </div>
-                    <button class="logout-button" id="logout-btn">Logout</button>
-                `;
-                
+    <div class="profile-info">
+        <div class="profile-field">
+            <div class="field-label">Status</div>
+            <div class="field-value">Logged In</div>
+        </div>
+        <div class="profile-field">
+            <div class="field-label">Account</div>
+            <div class="field-value">Error loading profile data</div>
+        </div>
+        <div class="profile-field credits">
+            <div class="field-label">Available Credits</div>
+            <div class="field-value-with-button">
+                <div class="field-value">--</div>
+                <button class="buy-credits-btn" id="buy-credits-btn-error">Buy Credits</button>
+            </div>
+        </div>
+    </div>
+    <button class="logout-button" id="logout-btn">Logout</button>
+`;
+                shadowRoot.getElementById('buy-credits-btn-error').addEventListener('click', () => {
+                window.open('https://www.solthron.com/subscription', '_blank');
+                });
                 shadowRoot.getElementById('logout-btn').addEventListener('click', async () => {
                     try {
                         await BackendAuth.logout();
