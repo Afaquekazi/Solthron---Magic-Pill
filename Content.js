@@ -880,7 +880,7 @@ function getPDFAnalysisPrompts() {
         
         highlight_action_items: 'Scan this PDF for actionable items and recommendations. Extract specific tasks, implementation steps, deadlines or timelines, and measurable outcomes mentioned. Present as a prioritized action list with context for each item. If no explicit actions are mentioned, suggest practical next steps based on the document\'s content.',
         
-        all_above: 'Provide a comprehensive PDF analysis with four detailed sections: (1) Executive Summary - document purpose, main findings, key arguments, supporting evidence, and overall conclusions, (2) Critical Insights - extract 8-10 key points with explanations and relevance to decision-making, (3) Action Plan - specific actionable items, implementation steps, timelines, and suggested next steps, (4) Strategic Assessment - business implications, risks, opportunities, and recommendations for stakeholders. Format each section with clear headings, bullet points, and prioritized information for executive consumption.'
+        quick_overview: 'Analyze this attached file completely and give me a clear, brief summary of what it contains and its main purpose. After I understand the content, I\'ll specify what I need you to do with it.'
     };
 }
 
@@ -892,7 +892,7 @@ function getExcelAnalysisPrompts() {
         
         business_intelligence_visuals: 'Transform this Excel data into actionable business intelligence. Identify the key performance indicators and metrics from this data. Recommend specific chart types (bar, line, pie, scatter) for different data dimensions and explain why each chart type fits. Suggest a dashboard layout with 4-6 key visualizations. Include insights about trends, patterns, and business implications. Focus on turning this data into strategic decisions.',
         
-        all_above: 'Provide a complete Excel analysis package: (1) Data structure overview with statistics and quality assessment, (2) 5-8 practical formulas with exact syntax and placement instructions, (3) Business intelligence insights with specific visualization recommendations and dashboard design. Structure as a comprehensive report with clear sections and actionable next steps for implementation.'
+        quick_overview: 'Analyze this attached file completely and give me a clear, brief summary of what it contains and its main purpose. After I understand the content, I\'ll specify what I need you to do with it.'
     };
 }
 
@@ -904,7 +904,7 @@ function getImageAnalysisPrompts() {
         
         generate_ai_prompts: 'Create detailed AI image generation prompts to recreate this image\'s style and content. Provide 3-4 different prompt variations optimized for AI image generators like Midjourney, DALL-E, or Stable Diffusion. Include comprehensive scene descriptions, artistic style keywords, technical parameters (lighting, composition, perspective), color palette descriptors, and quality modifiers. Each prompt should be ready to use and capture the essence of this image for recreation.',
         
-        all_above: 'Provide complete image analysis including: (1) Comprehensive Visual Analysis - detailed description of all elements, composition, lighting, style, and technical aspects, (2) OCR Text Extraction - complete transcription of all visible text with formatting and context, (3) AI Generation Prompts - 3-4 ready-to-use prompts for recreating this image style in AI generators, (4) Overall Assessment - key insights about the image\'s purpose, quality, and potential applications. Structure each section clearly for maximum utility.'
+        quick_overview: 'Analyze this attached file completely and give me a clear, brief summary of what it contains and its main purpose. After I understand the content, I\'ll specify what I need you to do with it.'
     };
 }
 
@@ -1062,7 +1062,7 @@ function showPDFAnalysisNotification(filename, fileSize, platform) {
                 transition: all 0.2s ease;
             ">⚡ Highlight Action Items</button>
             
-            <button class="pdf-option-btn" data-option="all_above" style="
+            <button class="pdf-option-btn" data-option="quick_overview" style="
                 background: rgba(255,215,0,0.1);
                 border: 1px solid rgba(255,215,0,0.3);
                 color: white;
@@ -1072,7 +1072,7 @@ function showPDFAnalysisNotification(filename, fileSize, platform) {
                 cursor: pointer;
                 text-align: left;
                 transition: all 0.2s ease;
-            ">🎯 All of Above</button>
+            ">🎯 Quick Overview</button>
         </div>
         
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -1230,7 +1230,7 @@ function showExcelAnalysisNotification(filename, fileSize, platform) {
                 transition: all 0.2s ease;
             ">📈 Business Intelligence & Visualizations</button>
             
-            <button class="excel-option-btn" data-option="all_above" style="
+            <button class="excel-option-btn" data-option="quick_overview" style="
                 background: rgba(34,139,34,0.1);
                 border: 1px solid rgba(34,139,34,0.3);
                 color: white;
@@ -1240,7 +1240,7 @@ function showExcelAnalysisNotification(filename, fileSize, platform) {
                 cursor: pointer;
                 text-align: left;
                 transition: all 0.2s ease;
-            ">🎯 All of Above</button>
+            ">🎯 Quick Overview</button>
         </div>
         
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -1398,7 +1398,7 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
                 transition: all 0.2s ease;
             ">🎨 Generate AI Image Prompts</button>
             
-            <button class="image-option-btn" data-option="all_above" style="
+            <button class="image-option-btn" data-option="quick_overview" style="
                 background: rgba(138,43,226,0.1);
                 border: 1px solid rgba(138,43,226,0.3);
                 color: white;
@@ -1408,7 +1408,7 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
                 cursor: pointer;
                 text-align: left;
                 transition: all 0.2s ease;
-            ">🎯 All of Above</button>
+            ">🎯 Quick Overview</button>
         </div>
         
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
