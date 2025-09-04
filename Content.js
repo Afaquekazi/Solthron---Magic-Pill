@@ -10,6 +10,9 @@ let currentCategory = null;
 let activeNoteId = null;
 let isStarActive = false;
 let isButtonVisible = false;
+// Right-click feature state tracking
+let rightClickFeaturesEnabled = false;
+let lastSelectedRightClickMode = null;
 let pageCredits = null;
 
 // ========== MAGIC PILL VARIABLES ==========
@@ -4183,8 +4186,22 @@ function initializeUIHandlers() {
     modeSelect.addEventListener('change', (e) => {
         selectedMode = e.target.value;
         localStorage.setItem('solthron-mode', selectedMode);
+        
+        // Track if a right-click feature was selected
+        const isRightClickMode = selectedMode === 'image_prompt' || selectedMode === 'smart_followups';
+        
+        if (isRightClickMode) {
+            rightClickFeaturesEnabled = true;
+            lastSelectedRightClickMode = selectedMode;
+            console.log(`🎯 Right-click feature enabled: ${selectedMode}`);
+        } else {
+            // Non-right-click modes disable right-click features
+            rightClickFeaturesEnabled = false;
+            lastSelectedRightClickMode = null;
+        }
+        
         outputText.classList.add('placeholder');
-
+    
         const placeholderMessages = {
             image_prompt: 'Right-click an image to generate a prompt...',
             save_note: 'Highlight text and double-click to save as note...',
@@ -4195,7 +4212,7 @@ function initializeUIHandlers() {
             smart_enhancements: 'Highlight text and double-click to get enhancement suggestions...',
             default: 'Highlight text to begin...'
         };
-
+    
         outputText.textContent = placeholderMessages[selectedMode] || placeholderMessages.default;
         lastResult = null;
         localStorage.removeItem('solthron-last-result');
@@ -4448,10 +4465,16 @@ function initializeProfileHandlers() {
 
 // Context menu handlers (right-click functionality)
 document.addEventListener('contextmenu', async (e) => {
+    // Check if right-click features are enabled
+    if (!rightClickFeaturesEnabled || !isButtonVisible) {
+        return; // Let normal right-click behavior happen
+    }
+    
     const target = e.target;
     
-    if (isImage(target) && selectedMode.startsWith('image_')) {
+    if (isImage(target) && selectedMode === 'image_prompt') {
         e.preventDefault();
+        console.log('🖼️ Processing image with right-click (feature enabled)');
         showShimmerLoading('Processing image...');
         solthronContainer.style.display = 'block';
         solthronContainer.style.pointerEvents = 'auto';
@@ -4465,10 +4488,11 @@ document.addEventListener('contextmenu', async (e) => {
         const platform = detectAIPlatform();
         
         if (platform === 'unknown') {
-            return;
+            return; // Let normal right-click behavior happen
         }
         
         e.preventDefault();
+        console.log('🤖 Processing smart followups with right-click (feature enabled)');
         
         const conversation = extractConversation();
         console.log("=== DEBUG: EXTRACTED CONVERSATION ===");
@@ -4530,7 +4554,6 @@ document.addEventListener('contextmenu', async (e) => {
             showError('Error analyzing conversation: ' + error.message);
         }
     }
-
 });
 
 async function processImage(img) {
@@ -4584,9 +4607,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         button.style.display = isButtonVisible ? 'block' : 'none';
         
-        if (!isButtonVisible && solthronContainer.style.display === 'block') {
-            solthronContainer.style.display = 'none';
-            solthronContainer.style.pointerEvents = 'none';
+        if (!isButtonVisible) {
+            // Disable right-click features when extension is hidden
+            rightClickFeaturesEnabled = false;
+            lastSelectedRightClickMode = null;
+            console.log('🔒 Right-click features disabled (extension hidden)');
+            
+            if (solthronContainer.style.display === 'block') {
+                solthronContainer.style.display = 'none';
+                solthronContainer.style.pointerEvents = 'none';
+            }
+        } else {
+            // Re-enable right-click features if a right-click mode was previously selected
+            const isRightClickMode = selectedMode === 'image_prompt' || selectedMode === 'smart_followups';
+            if (isRightClickMode) {
+                rightClickFeaturesEnabled = true;
+                lastSelectedRightClickMode = selectedMode;
+                console.log(`🎯 Right-click feature re-enabled: ${selectedMode}`);
+            }
         }
         
         sendResponse({success: true});
