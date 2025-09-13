@@ -21,6 +21,7 @@ let magicPillIcon = null;
 let currentInputField = null;
 let lastMagicPillClick = 0;
 const MAGIC_PILL_COOLDOWN = 2000; // 2 seconds cooldown
+let magicPillOriginalIcon = null;
 
 
 // ========== FILE ANALYSIS VARIABLES ==========
@@ -1763,13 +1764,16 @@ function createMagicPillIcon() {
         pointer-events: auto;
     `;
     
-    magicPillIcon.innerHTML = `
+    // Store the original icon HTML globally
+    magicPillOriginalIcon = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2v6m0 4v6m0 4v-2"></path>
             <path d="M2 12h6m4 0h6m4 0h-2"></path>
             <circle cx="12" cy="12" r="3"></circle>
         </svg>
     `;
+    
+    magicPillIcon.innerHTML = magicPillOriginalIcon;
     
     magicPillIcon.addEventListener('mouseenter', () => {
         magicPillIcon.style.transform = 'scale(1.1)';
@@ -1790,27 +1794,42 @@ async function handleMagicPillClick(e) {
     e.preventDefault();
     e.stopPropagation();
     
-    // Rate limiting
-    const now = Date.now();
-    if (now - lastMagicPillClick < MAGIC_PILL_COOLDOWN) {
-        showMagicPillError('Please wait a moment...');
-        return;
-    }
-    lastMagicPillClick = now;
-    
     if (!currentInputField) return;
     
     const text = getInputText(currentInputField);
     if (!text.trim()) return;
     
+    // ✅ START ANIMATION IMMEDIATELY
+    // Replace the spinning circle with thinking dots
+magicPillIcon.innerHTML = `
+<div style="display: flex; gap: 3px; align-items: center; justify-content: center; height: 100%;">
+    <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite;"></span>
+    <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out 0.2s infinite;"></span>
+    <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out 0.4s infinite;"></span>
+</div>
+`;
+    
+    // Rate limiting check
+    const now = Date.now();
+    if (now - lastMagicPillClick < MAGIC_PILL_COOLDOWN) {
+        // Reset to original icon (not spinning circle)
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
+        showMagicPillError('Please wait a moment...');
+        return;
+    }
+    lastMagicPillClick = now;
+    
     console.log('🚀 Processing text with magic pill:', text.substring(0, 50) + '...');
     
-    // ✅ ENHANCED: Check credits with warnings
+    // ✅ Check credits (animation already running)
     const creditCheck = await checkCreditsWithWarnings('magic_pill_enhance');
     
     // ❌ INSUFFICIENT CREDITS - Show login/upgrade prompt
     if (!creditCheck.success) {
         console.log('❌ Magic pill credit check failed:', creditCheck.message);
+        
+        // Reset to original icon
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
         
         const wasHidden = button.style.display === 'none';
         if (wasHidden) {
@@ -1850,6 +1869,9 @@ async function handleMagicPillClick(e) {
     if (creditCheck.showWarning) {
         console.log('⚠️ Magic pill low credits warning:', creditCheck.warningMessage);
         
+        // Reset to original icon while waiting
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
+        
         const creditsAfter = creditCheck.availableCredits - creditCheck.requiredCredits;
         showLowCreditWarning(creditCheck.warningMessage, creditsAfter);
         
@@ -1857,10 +1879,16 @@ async function handleMagicPillClick(e) {
         const checkUserDecision = () => {
             if (window.solthronProceedWithLowCredits === true) {
                 window.solthronProceedWithLowCredits = null; // Reset
+                // Re-start animation when user confirms
+                magicPillIcon.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" class="spinning">
+                        <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+                    </svg>
+                `;
                 proceedWithMagicPill(text); // Continue with magic pill
             } else if (window.solthronProceedWithLowCredits === false) {
                 window.solthronProceedWithLowCredits = null; // Reset
-                // User cancelled, do nothing
+                // User cancelled, icon already reset
             } else {
                 // Still waiting for decision, check again
                 setTimeout(checkUserDecision, 100);
@@ -1871,19 +1899,22 @@ async function handleMagicPillClick(e) {
         return;
     }
     
-    // ✅ SUFFICIENT CREDITS - Proceed normally
+    // ✅ SUFFICIENT CREDITS - Proceed normally (animation already running)
     proceedWithMagicPill(text);
 }
 
-// Extract magic pill processing logic
-async function proceedWithMagicPill(text) {
-    // Animation
-    const originalHTML = magicPillIcon.innerHTML;
-    magicPillIcon.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" class="spinning">
-            <path d="M21 12a9 9 0 11-6.219-8.56"></path>
-        </svg>
-    `;
+// Updated proceedWithMagicPill to accept originalHTML as parameter
+async function proceedWithMagicPill(text, originalHTML = null) {
+    // If originalHTML wasn't passed, store current state (for backward compatibility)
+    if (!originalHTML) {
+        originalHTML = magicPillIcon.innerHTML;
+        // Start animation if not already running
+        magicPillIcon.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" class="spinning">
+                <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+            </svg>
+        `;
+    }
     
     try {
         // Send request to magic pill endpoint
@@ -1940,11 +1971,74 @@ async function proceedWithMagicPill(text) {
     }
 }
 
+// Extract magic pill processing logic
+async function proceedWithMagicPill(text) {
+    try {
+        // Send request to magic pill endpoint
+        const requestData = {
+            type: 'magic_pill_enhance',
+            data: {
+                text: text,
+                platform: detectAIPlatform()
+            }
+        };
+        
+        console.log('🔍 Sending magic pill request:', requestData);
+        
+        const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(requestData, response => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    console.log('🔍 Raw response from background script:', response);
+                    resolve(response);
+                }
+            });
+        });
+        
+        if (response && response.success && response.data) {
+            const enhancedText = response.data.prompt;
+            console.log('✅ Enhanced text received');
+            
+            // Replace the text in the input field
+            setInputText(currentInputField, enhancedText);
+            
+            // Success animation
+            magicPillIcon.style.background = '#00ff00';
+            magicPillIcon.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            `;
+            
+            setTimeout(() => {
+                magicPillIcon.style.background = '#ffff00';
+                // ✅ ALWAYS reset to the original icon, not the spinning one
+                magicPillIcon.innerHTML = magicPillOriginalIcon;
+                hideMagicPill();
+            }, 1500);
+            
+        } else {
+            throw new Error('Failed to enhance text');
+        }
+        
+    } catch (error) {
+        console.error('❌ Magic pill error:', error);
+        showMagicPillError('Enhancement failed');
+        // ✅ Reset to original icon on error
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
+    }
+}
+
 function showMagicPillError(message) {
     console.log('⚠️', message);
     magicPillIcon.style.background = '#ff6b6b';
     setTimeout(() => {
         magicPillIcon.style.background = '#ffff00';
+        // Ensure icon is reset to original
+        if (magicPillIcon && magicPillOriginalIcon) {
+            magicPillIcon.innerHTML = magicPillOriginalIcon;
+        }
     }, 1000);
 }
 
@@ -3674,6 +3768,17 @@ function createUI() {
         .spinning {
             animation: spin 1s linear infinite;
         }
+
+        @keyframes bounce {
+    0%, 80%, 100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    40% {
+        transform: translateY(-6px) scale(1.2);
+        opacity: 0.7;
+    }
+}
 
         /* Responsive */
         @media screen and (max-width: 480px) {
