@@ -30,19 +30,12 @@ let gmailComposeField = null;
 const GMAIL_CHECK_INTERVAL = 2000;
 
 // ========== GMAIL TONE SELECTION VARIABLES ==========
-let selectedEmailTone = 'balanced'; // Default tone
+let selectedEmailMode = 'balanced'; // Default mode
 let toneDropdown = null;
-const emailTones = [
-    { id: 'balanced', label: '🤝 Balanced', description: 'Professional & Warm' },
-    { id: 'friendly', label: '😊 Friendly', description: 'Casual & Relaxed' },
-    { id: 'formal', label: '💼 Formal', description: 'Executive Level' },
-    { id: 'assertive', label: '💪 Assertive', description: 'Direct & Strong' },
-    { id: 'persuasive', label: '🎯 Persuasive', description: 'Compelling & Convincing' },
-    { id: 'empathetic', label: '🤗 Empathetic', description: 'Understanding & Caring' },
-    { id: 'urgent', label: '⚡ Urgent', description: 'Time-Sensitive' },
-    { id: 'apologetic', label: '🙏 Apologetic', description: 'Diplomatic & Sorry' },
-    { id: 'informative', label: '📊 Informative', description: 'Clear & Structured' },
-    { id: 'enthusiastic', label: '🎉 Enthusiastic', description: 'Positive & Energetic' }
+const emailModes = [
+    { id: 'polish', label: '✨ Polish', description: 'Minimal edits - Fix grammar only' },
+    { id: 'balanced', label: '⚖️ Balanced', description: 'Moderate enhancement' },
+    { id: 'reframe', label: '🔄 Reframe', description: 'Complete rewrite' }
 ];
 
 
@@ -1914,9 +1907,7 @@ function showToneDropdown(x, y) {
         padding: 4px;
         z-index: 1000000;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        min-width: 180px;
-        max-height: 300px;
-        overflow-y: auto;
+        min-width: 200px;
         animation: fadeIn 0.2s ease;
     `;
     
@@ -1930,8 +1921,8 @@ function showToneDropdown(x, y) {
     `;
     document.head.appendChild(style);
     
-    // Create tone options
-    emailTones.forEach(tone => {
+    // Create mode options (using emailModes instead of emailTones)
+    emailModes.forEach(mode => {
         const option = document.createElement('div');
         option.style.cssText = `
             padding: 8px 12px;
@@ -1947,10 +1938,10 @@ function showToneDropdown(x, y) {
         `;
         
         option.innerHTML = `
-            <span style="font-size: 16px;">${tone.label.split(' ')[0]}</span>
+            <span style="font-size: 16px;">${mode.label.split(' ')[0]}</span>
             <div style="flex: 1;">
-                <div style="font-weight: 500;">${tone.label.substring(2)}</div>
-                <div style="font-size: 11px; color: rgba(255,255,255,0.6);">${tone.description}</div>
+                <div style="font-weight: 500;">${mode.label.substring(2)}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.6);">${mode.description}</div>
             </div>
         `;
         
@@ -1964,13 +1955,13 @@ function showToneDropdown(x, y) {
         
         option.addEventListener('click', (e) => {
             e.stopPropagation();
-            selectedEmailTone = tone.id;
-            console.log(`📧 Selected tone: ${tone.label}`);
+            selectedEmailMode = mode.id;
+            console.log(`📧 Selected mode: ${mode.label}`);
             toneDropdown.remove();
             toneDropdown = null;
             
-            // Trigger enhancement with selected tone
-            handleMagicPillClick(e, tone.id);
+            // Trigger enhancement with selected mode
+            handleMagicPillClick(e, mode.id);
         });
         
         toneDropdown.appendChild(option);
@@ -2025,11 +2016,11 @@ async function proceedWithMagicPill(text, platform = null, tone = 'balanced') {
                     text: text,
                     platform: 'gmail',
                     context: emailContext,
-                    tone: tone || 'balanced' // Pass the selected tone
+                    mode: tone || 'balanced' // Pass the selected mode (parameter name stays 'tone' for compatibility
                 }
             };
             console.log('📧 Sending Gmail enhancement request with context:', emailContext);
-            console.log('📧 Using tone:', tone);
+            console.log('📧 Using mode:', tone);
         } else {
             // Regular AI platform enhancement
             requestData = {
