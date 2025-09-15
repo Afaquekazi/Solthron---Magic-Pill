@@ -29,6 +29,21 @@ let isGmailPage = false;
 let gmailComposeField = null;
 const GMAIL_CHECK_INTERVAL = 2000;
 
+// ========== GMAIL TONE SELECTION VARIABLES ==========
+let selectedEmailMode = 'balanced'; // Default mode
+let toneDropdown = null;
+const emailModes = [
+    { id: 'polish', label: '✨ Polish', description: 'Minimal edits - Fix grammar only' },
+    { id: 'balanced', label: '⚖️ Balanced', description: 'Moderate enhancement' },
+    { id: 'reframe', label: '🔄 Reframe', description: 'Complete rewrite' }
+];
+
+// Load saved email mode preference
+const savedEmailMode = localStorage.getItem('solthron-email-mode');
+if (savedEmailMode && emailModes.some(m => m.id === savedEmailMode)) {
+    selectedEmailMode = savedEmailMode;
+}
+
 
 // ========== FILE ANALYSIS VARIABLES ==========
 let fileAnalysisEnabled = true; // Always enabled for all file types
@@ -1860,114 +1875,162 @@ function createMagicPillIcon() {
         magicPillIcon.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15), 0 0 20px rgba(255, 255, 0, 0.3)';
     });
     
+    // Left-click handler - use default tone
     magicPillIcon.addEventListener('click', handleMagicPillClick);
+    
+    // ✨ NEW: Right-click handler for Gmail tone selection
+    magicPillIcon.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const platform = detectAIPlatform();
+        if (platform === 'gmail') {
+            showToneDropdown(e.pageX, e.pageY);
+        } else {
+            // For non-Gmail platforms, just trigger regular enhancement
+            handleMagicPillClick(e);
+        }
+    });
     
     document.body.appendChild(magicPillIcon);
 }
 
-async function handleMagicPillClick(e) {
+function showToneDropdown(x, y) {
+    // Remove any existing dropdown
+    if (toneDropdown) {
+        toneDropdown.remove();
+    }
+    
+    // Create dropdown container
+    toneDropdown = document.createElement('div');
+    toneDropdown.style.cssText = `
+        position: absolute;
+        left: ${x}px;
+        top: ${y}px;
+        background: #2a2a2a;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 4px;
+        z-index: 1000000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        min-width: 220px;
+        animation: fadeIn 0.2s ease;
+    `;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Add a header showing current selection
+    const header = document.createElement('div');
+    header.style.cssText = `
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 11px;
+        text-align: center;
+    `;
+    header.textContent = `Current: ${selectedEmailMode.charAt(0).toUpperCase() + selectedEmailMode.slice(1)}`;
+    toneDropdown.appendChild(header);
+    
+    // Create mode options
+    emailModes.forEach(mode => {
+        const option = document.createElement('div');
+        const isSelected = mode.id === selectedEmailMode;
+        
+        option.style.cssText = `
+            padding: 8px 12px;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s ease;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            ${isSelected ? 'background: rgba(255, 255, 0, 0.1);' : ''}
+        `;
+        
+        option.innerHTML = `
+            <span style="font-size: 16px;">${mode.label.split(' ')[0]}</span>
+            <div style="flex: 1;">
+                <div style="font-weight: 500;">${mode.label.substring(2)}</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.6);">${mode.description}</div>
+            </div>
+            ${isSelected ? '<span style="color: #ffff00;">✓</span>' : ''}
+        `;
+        
+        option.addEventListener('mouseenter', () => {
+            if (!isSelected) {
+                option.style.background = 'rgba(255, 255, 255, 0.1)';
+            }
+        });
+        
+        option.addEventListener('mouseleave', () => {
+            if (!isSelected) {
+                option.style.background = 'transparent';
+            }
+        });
+        
+        option.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedEmailMode = mode.id;
+            console.log(`📧 Mode set to: ${mode.label}`);
+            
+            // Save preference
+            localStorage.setItem('solthron-email-mode', mode.id);
+            
+            // Show confirmation
+            option.style.background = 'rgba(0, 255, 0, 0.2)';
+            setTimeout(() => {
+                toneDropdown.remove();
+                toneDropdown = null;
+            }, 200);
+        });
+        
+        toneDropdown.appendChild(option);
+    });
+    
+    document.body.appendChild(toneDropdown);
+    
+    // Close dropdown when clicking elsewhere
+    const closeDropdown = (e) => {
+        if (toneDropdown && !toneDropdown.contains(e.target)) {
+            toneDropdown.remove();
+            toneDropdown = null;
+            document.removeEventListener('click', closeDropdown);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeDropdown);
+    }, 100);
+}
+
+async function handleMagicPillClick(e) {  // Remove tone parameter
     e.preventDefault();
     e.stopPropagation();
     
-    if (!currentInputField) return;
+    // Rest of the existing code...
     
-    const text = getInputText(currentInputField);
-    if (!text.trim()) return;
-    
-    // START ANIMATION IMMEDIATELY
-    magicPillIcon.innerHTML = `
-    <div style="display: flex; gap: 3px; align-items: center; justify-content: center; height: 100%;">
-        <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite;"></span>
-        <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out 0.2s infinite;"></span>
-        <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out 0.4s infinite;"></span>
-    </div>
-    `;
-    
-    // Rate limiting check
-    const now = Date.now();
-    if (now - lastMagicPillClick < MAGIC_PILL_COOLDOWN) {
-        magicPillIcon.innerHTML = magicPillOriginalIcon;
-        showMagicPillError('Please wait a moment...');
-        return;
-    }
-    lastMagicPillClick = now;
-    
+    // When calling proceedWithMagicPill, pass the tone
     const platform = detectAIPlatform();
-    console.log('🚀 Processing text with magic pill for platform:', platform);
-    
-    // Check credits
-    const creditCheck = await checkCreditsWithWarnings('magic_pill_enhance');
-    
-    if (!creditCheck.success) {
-        console.log('❌ Magic pill credit check failed:', creditCheck.message);
-        magicPillIcon.innerHTML = magicPillOriginalIcon;
-        
-        // Show login/upgrade prompt logic (keeping existing code)
-        const wasHidden = button.style.display === 'none';
-        if (wasHidden) {
-            button.style.display = 'block';
-        }
-        
-        const buttonRect = button.getBoundingClientRect();
-        solthronContainer.style.display = 'block';
-        solthronContainer.style.pointerEvents = 'auto';
-        positionContainer(buttonRect);
-        
-        if (wasHidden) {
-            button.style.display = 'none';
-        }
-        
-        if (creditCheck.showUpgrade) {
-            showError(creditCheck.message + ' Click "Get More Credits" to purchase.');
-        } else {
-            showError(creditCheck.message || "Please login to use this feature");
-            closeAllSections();
-            const profileView = shadowRoot.getElementById('profile-view');
-            const profileBtn = shadowRoot.getElementById('profile-btn');
-            const outputContainer = shadowRoot.querySelector('.output-container');
-            
-            profileView.style.display = 'block';
-            outputContainer.style.display = 'none';
-            profileBtn.querySelector('svg').style.stroke = '#00ff00';
-        }
-        
-        return;
+    if (platform === 'gmail') {
+        proceedWithMagicPill(text, platform, tone);
+    } else {
+        proceedWithMagicPill(text, platform);
     }
-    
-    // Handle low credits warning (keeping existing code)
-    if (creditCheck.showWarning) {
-        console.log('⚠️ Magic pill low credits warning:', creditCheck.warningMessage);
-        magicPillIcon.innerHTML = magicPillOriginalIcon;
-        
-        const creditsAfter = creditCheck.availableCredits - creditCheck.requiredCredits;
-        showLowCreditWarning(creditCheck.warningMessage, creditsAfter);
-        
-        const checkUserDecision = () => {
-            if (window.solthronProceedWithLowCredits === true) {
-                window.solthronProceedWithLowCredits = null;
-                magicPillIcon.innerHTML = `
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" class="spinning">
-                        <path d="M21 12a9 9 0 11-6.219-8.56"></path>
-                    </svg>
-                `;
-                proceedWithMagicPill(text, platform); // Pass platform
-            } else if (window.solthronProceedWithLowCredits === false) {
-                window.solthronProceedWithLowCredits = null;
-            } else {
-                setTimeout(checkUserDecision, 100);
-            }
-        };
-        
-        checkUserDecision();
-        return;
-    }
-    
-    // Proceed with enhancement
-    proceedWithMagicPill(text, platform);
 }
 
 // Updated proceedWithMagicPill to accept originalHTML as parameter
-async function proceedWithMagicPill(text, platform = null) {
+async function proceedWithMagicPill(text, platform = null, tone = 'balanced') {
     if (!platform) {
         platform = detectAIPlatform();
     }
@@ -1975,7 +2038,7 @@ async function proceedWithMagicPill(text, platform = null) {
     try {
         let requestData;
         
-        // Special handling for Gmail
+        // Special handling for Gmail with tone support
         if (platform === 'gmail') {
             const emailContext = extractGmailContext();
             requestData = {
@@ -1983,10 +2046,12 @@ async function proceedWithMagicPill(text, platform = null) {
                 data: {
                     text: text,
                     platform: 'gmail',
-                    context: emailContext
+                    context: emailContext,
+                    mode: tone || 'balanced' // Pass the selected mode (parameter name stays 'tone' for compatibility
                 }
             };
             console.log('📧 Sending Gmail enhancement request with context:', emailContext);
+            console.log('📧 Using mode:', tone);
         } else {
             // Regular AI platform enhancement
             requestData = {
@@ -2044,62 +2109,118 @@ async function proceedWithMagicPill(text, platform = null) {
 }
 
 // Extract magic pill processing logic
-async function proceedWithMagicPill(text) {
-    try {
-        // Send request to magic pill endpoint
-        const requestData = {
-            type: 'magic_pill_enhance',
-            data: {
-                text: text,
-                platform: detectAIPlatform()
+async function handleMagicPillClick(e) {  // Remove tone parameter
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!currentInputField) return;
+    
+    const text = getInputText(currentInputField);
+    if (!text.trim()) return;
+    
+    // START ANIMATION IMMEDIATELY
+    magicPillIcon.innerHTML = `
+    <div style="display: flex; gap: 3px; align-items: center; justify-content: center; height: 100%;">
+        <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out infinite;"></span>
+        <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out 0.2s infinite;"></span>
+        <span style="width: 4px; height: 4px; background: #000; border-radius: 50%; animation: bounce 1.4s ease-in-out 0.4s infinite;"></span>
+    </div>
+    `;
+    
+    // Rate limiting check
+    const now = Date.now();
+    if (now - lastMagicPillClick < MAGIC_PILL_COOLDOWN) {
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
+        showMagicPillError('Please wait a moment...');
+        return;
+    }
+    lastMagicPillClick = now;
+    
+    const platform = detectAIPlatform();
+    console.log('🚀 Processing text with magic pill for platform:', platform);
+    if (platform === 'gmail') {
+    console.log('📧 Using mode:', selectedEmailMode);
+    }
+    
+    // Check credits
+    const creditCheck = await checkCreditsWithWarnings('magic_pill_enhance');
+    
+    if (!creditCheck.success) {
+        console.log('❌ Magic pill credit check failed:', creditCheck.message);
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
+        
+        // Show login/upgrade prompt logic
+        const wasHidden = button.style.display === 'none';
+        if (wasHidden) {
+            button.style.display = 'block';
+        }
+        
+        const buttonRect = button.getBoundingClientRect();
+        solthronContainer.style.display = 'block';
+        solthronContainer.style.pointerEvents = 'auto';
+        positionContainer(buttonRect);
+        
+        if (wasHidden) {
+            button.style.display = 'none';
+        }
+        
+        if (creditCheck.showUpgrade) {
+            showError(creditCheck.message + ' Click "Get More Credits" to purchase.');
+        } else {
+            showError(creditCheck.message || "Please login to use this feature");
+            closeAllSections();
+            const profileView = shadowRoot.getElementById('profile-view');
+            const profileBtn = shadowRoot.getElementById('profile-btn');
+            const outputContainer = shadowRoot.querySelector('.output-container');
+            
+            profileView.style.display = 'block';
+            outputContainer.style.display = 'none';
+            profileBtn.querySelector('svg').style.stroke = '#00ff00';
+        }
+        
+        return;
+    }
+    
+    // Handle low credits warning
+    if (creditCheck.showWarning) {
+        console.log('⚠️ Magic pill low credits warning:', creditCheck.warningMessage);
+        magicPillIcon.innerHTML = magicPillOriginalIcon;
+        
+        const creditsAfter = creditCheck.availableCredits - creditCheck.requiredCredits;
+        showLowCreditWarning(creditCheck.warningMessage, creditsAfter);
+        
+        const checkUserDecision = () => {
+            if (window.solthronProceedWithLowCredits === true) {
+                window.solthronProceedWithLowCredits = null;
+                magicPillIcon.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" class="spinning">
+                        <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+                    </svg>
+                `;
+                // Pass platform and tone when user confirms
+                if (platform === 'gmail') {
+                    proceedWithMagicPill(text, platform, selectedEmailMode);
+                } else {
+                    proceedWithMagicPill(text, platform);
+                }
+            } else if (window.solthronProceedWithLowCredits === false) {
+                window.solthronProceedWithLowCredits = null;
+            } else {
+                setTimeout(checkUserDecision, 100);
             }
         };
         
-        console.log('🔍 Sending magic pill request:', requestData);
-        
-        const response = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(requestData, response => {
-                if (chrome.runtime.lastError) {
-                    reject(chrome.runtime.lastError);
-                } else {
-                    console.log('🔍 Raw response from background script:', response);
-                    resolve(response);
-                }
-            });
-        });
-        
-        if (response && response.success && response.data) {
-            const enhancedText = response.data.prompt;
-            console.log('✅ Enhanced text received');
-            
-            // Replace the text in the input field
-            setInputText(currentInputField, enhancedText);
-            
-            // Success animation
-            magicPillIcon.style.background = '#00ff00';
-            magicPillIcon.innerHTML = `
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-            `;
-            
-            setTimeout(() => {
-                magicPillIcon.style.background = '#ffff00';
-                // ✅ ALWAYS reset to the original icon, not the spinning one
-                magicPillIcon.innerHTML = magicPillOriginalIcon;
-                hideMagicPill();
-            }, 1500);
-            
-        } else {
-            throw new Error('Failed to enhance text');
-        }
-        
-    } catch (error) {
-        console.error('❌ Magic pill error:', error);
-        showMagicPillError('Enhancement failed');
-        // ✅ Reset to original icon on error
-        magicPillIcon.innerHTML = magicPillOriginalIcon;
+        checkUserDecision();
+        return;
     }
+    
+    // Proceed with enhancement - use selectedEmailMode for Gmail
+    if (platform === 'gmail') {
+        proceedWithMagicPill(text, platform, selectedEmailMode);
+    } else {
+        proceedWithMagicPill(text, platform);
+    }
+
 }
 
 function showMagicPillError(message) {
