@@ -1901,12 +1901,12 @@ function showToneDropdown(x, y) {
         toneDropdown.remove();
     }
     
-    // Create dropdown container
+    // Create dropdown container (temporarily invisible to measure)
     toneDropdown = document.createElement('div');
     toneDropdown.style.cssText = `
         position: absolute;
-        left: ${x}px;
-        top: ${y}px;
+        left: 0px;
+        top: 0px;
         background: #2a2a2a;
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 8px;
@@ -1914,20 +1914,23 @@ function showToneDropdown(x, y) {
         z-index: 1000000;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         min-width: 220px;
-        animation: fadeIn 0.2s ease;
+        visibility: hidden; /* Hide initially to measure */
     `;
     
-    // Add animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-    `;
-    document.head.appendChild(style);
+    // Add animation style if not present
+    if (!document.querySelector('#tone-dropdown-animation')) {
+        const style = document.createElement('style');
+        style.id = 'tone-dropdown-animation';
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
     
-    // Add a header showing current selection
+    // Add header showing current selection
     const header = document.createElement('div');
     header.style.cssText = `
         padding: 8px 12px;
@@ -1998,7 +2001,39 @@ function showToneDropdown(x, y) {
         toneDropdown.appendChild(option);
     });
     
+    // Add to document to measure dimensions
     document.body.appendChild(toneDropdown);
+    
+    // Get dropdown dimensions
+    const dropdownRect = toneDropdown.getBoundingClientRect();
+    const dropdownWidth = dropdownRect.width;
+    const dropdownHeight = dropdownRect.height;
+    
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate optimal position
+    let finalX = x;
+    let finalY = y;
+    
+    // Check horizontal overflow
+    if (x + dropdownWidth > viewportWidth - 10) {
+        // Position to the left of cursor instead
+        finalX = Math.max(10, x - dropdownWidth);
+    }
+    
+    // Check vertical overflow
+    if (y + dropdownHeight > viewportHeight - 10) {
+        // Position above cursor instead
+        finalY = Math.max(10, y - dropdownHeight);
+    }
+    
+    // Apply final position and make visible
+    toneDropdown.style.left = `${finalX}px`;
+    toneDropdown.style.top = `${finalY}px`;
+    toneDropdown.style.visibility = 'visible';
+    toneDropdown.style.animation = 'fadeIn 0.2s ease';
     
     // Close dropdown when clicking elsewhere
     const closeDropdown = (e) => {
