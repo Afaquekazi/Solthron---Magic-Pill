@@ -4871,7 +4871,7 @@ function createAuthIframe(type = 'signup') {
             backdrop-filter: blur(4px);
         `;
         
-        const authUrl = `https://solthron.com/quick-auth.html?type=${type}&extension=true`;
+        const authUrl = `https://solthron.com/quick-auth?type=${type}&extension=true`;
         iframe.src = authUrl;
         
         document.body.appendChild(backdrop);
