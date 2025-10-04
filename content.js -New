@@ -175,7 +175,7 @@ function extractGmailContext() {
         }
         
     } catch (error) {
-        console.log('Error extracting Gmail context:', error);
+
     }
     
     return context;
@@ -329,20 +329,20 @@ function measureTextPosition(measurer, text, textarea) {
 // ========== MAGIC PILL FUNCTIONS ==========
 function initializeMagicPill() {
     const platform = detectAIPlatform();
-    console.log('🔍 Platform detected:', platform);
+
     
     if (platform === 'unknown') {
-        console.log('❌ Not on a supported AI platform');
+
         return;
     }
     
     if (!autoModeEnabled) {
-        console.log('❌ Auto mode not enabled');
+
         removeMagicPill();
         return;
     }
     
-    console.log('✅ Initializing magic pill for', platform);
+
     monitorInputField(platform);
 }
 
@@ -413,7 +413,7 @@ function monitorInputField(platform) {
                     !el.readOnly) {
                     
                     inputField = el;
-                    console.log('✅ Found input field:', selector);
+
                     break;
                 }
             }
@@ -422,11 +422,11 @@ function monitorInputField(platform) {
         
         // ✅ FIX: Always check if we need to attach to a new field
         if (inputField && inputField !== currentInputField) {
-            console.log('🔄 New input field detected, switching attachment');
+
             currentInputField = inputField;
             attachMagicPillToInput(inputField);
         } else if (!inputField && currentInputField) {
-            console.log('⚠️ Input field lost, clearing current reference');
+
             currentInputField = null;
             hideMagicPill();
         }
@@ -459,7 +459,7 @@ function monitorInputField(platform) {
         window[`solthron${platform}Monitor`] = platformMonitor;
     } else {
         // Gentler monitoring for ChatGPT
-        console.log('🎯 Using gentle monitoring for ChatGPT to preserve icon');
+
     }
     
     // ✅ FIX: Enhanced mutation observer that catches input field changes
@@ -489,7 +489,7 @@ function monitorInputField(platform) {
         });
         
         if (shouldCheck) {
-            console.log('🔄 Input-related DOM change detected');
+
             setTimeout(findAndMonitorInput, 300);
         }
     });
@@ -502,7 +502,7 @@ function monitorInputField(platform) {
 
 // ✅ FIX: Enhanced attachment that handles field replacement
 function attachMagicPillToInput(inputField) {
-    console.log('📎 Attaching magic pill to input field');
+
     
     // ✅ FIX: Always remove existing listeners first (even if field is different)
     if (currentInputField && currentInputField !== inputField) {
@@ -513,9 +513,9 @@ function attachMagicPillToInput(inputField) {
             currentInputField.removeEventListener('keyup', handleCursorMove);
             currentInputField.removeEventListener('click', handleCursorMove);
             currentInputField.removeEventListener('keydown', handleKeyboardShortcut);
-            console.log('🧹 Cleaned up old input field listeners');
+
         } catch (error) {
-            console.log('⚠️ Error cleaning up old listeners (field might be removed):', error.message);
+            
         }
     }
     
@@ -527,7 +527,7 @@ function attachMagicPillToInput(inputField) {
         inputField.addEventListener('keyup', handleCursorMove);
         inputField.addEventListener('click', handleCursorMove);
         inputField.addEventListener('keydown', handleKeyboardShortcut);
-        console.log('✅ Magic pill attached to new input field');
+
     } catch (error) {
         console.error('❌ Failed to attach magic pill listeners:', error);
     }
@@ -567,7 +567,7 @@ function handleKeyboardShortcut(e) {
         // Only trigger if magic pill is visible and there's text
         const text = getInputText(e.target);
         if (text.trim().length > 0 && magicPillIcon && magicPillIcon.style.display !== 'none') {
-            console.log('⌨️ Keyboard shortcut triggered (Ctrl+Shift+Enter)');
+            
             
             // Create a synthetic event object for handleMagicPillClick
             const syntheticEvent = {
@@ -676,24 +676,24 @@ function showMagicPill(inputField) {
 
 function initializeFileAnalysis() {
     const platform = detectAIPlatform();
-    console.log('📄 Initializing File Analysis (PDF, Excel & Images) for:', platform);
+    
     
     if (platform === 'unknown') {
-        console.log('❌ Platform not supported for file analysis');
+
         return;
     }
     
     if (!fileAnalysisEnabled) {
-        console.log('❌ File analysis not enabled');
+
         return;
     }
     
-    console.log('✅ Setting up file upload detection (PDF, Excel & Images)');
+    
     monitorFileUploads(platform);
 }
 
 function monitorFileUploads(platform) {
-    console.log(`🔍 Starting file upload monitoring for ${platform}`);
+
     
     // Clean up any existing observers
     if (window.fileObserver) {
@@ -735,7 +735,7 @@ function monitorFileUploads(platform) {
     // Also monitor for direct file input changes
     document.addEventListener('change', handleFileInputChange, true);
     
-    console.log('✅ File upload monitoring initialized');
+
 }
 
 function checkForFileElements(element, platform) {
@@ -767,7 +767,7 @@ function checkForFileElements(element, platform) {
             if (!fileElement.hasAttribute('data-solthron-monitored')) {
                 fileElement.addEventListener('change', handleFileInputChange);
                 fileElement.setAttribute('data-solthron-monitored', 'true');
-                console.log('📎 Added file monitoring to input element');
+
             }
         }
     }
@@ -798,7 +798,7 @@ function checkForUploadedFileIndicators(element, platform) {
             if (text.toLowerCase().includes('.pdf') || text.toLowerCase().includes('pdf')) {
                 const filename = extractFilename(text, 'pdf');
                 if (filename && filename !== lastFileProcessed) {
-                    console.log('📄 PDF file detected:', filename);
+
                     handleFileDetection(filename, uploadedElement, platform, 'pdf');
                 }
             }
@@ -808,7 +808,7 @@ function checkForUploadedFileIndicators(element, platform) {
                      text.toLowerCase().includes('excel') || text.toLowerCase().includes('.csv')) {
                 const filename = extractFilename(text, 'excel');
                 if (filename && filename !== lastFileProcessed) {
-                    console.log('📊 Excel file detected:', filename);
+
                     handleFileDetection(filename, uploadedElement, platform, 'excel');
                 }
             }
@@ -820,7 +820,7 @@ function checkForUploadedFileIndicators(element, platform) {
                      text.toLowerCase().includes('image') || text.toLowerCase().includes('picture')) {
                 const filename = extractFilename(text, 'image');
                 if (filename && filename !== lastFileProcessed) {
-                    console.log('🖼️ Image file detected:', filename);
+
                     handleFileDetection(filename, uploadedElement, platform, 'image');
                 }
             }
@@ -837,7 +837,7 @@ function handleFileInputChange(event) {
     for (const file of files) {
         // Check for PDF files
         if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-            console.log('📄 PDF file selected:', file.name);
+
             handleFileDetection(file.name, fileInput, detectAIPlatform(), 'pdf', file.size);
         }
         // Check for Excel files
@@ -847,7 +847,7 @@ function handleFileInputChange(event) {
                  file.name.toLowerCase().endsWith('.xlsx') || 
                  file.name.toLowerCase().endsWith('.xls') || 
                  file.name.toLowerCase().endsWith('.csv')) {
-            console.log('📊 Excel file selected:', file.name);
+
             handleFileDetection(file.name, fileInput, detectAIPlatform(), 'excel', file.size);
         }
         // Check for Image files
@@ -858,7 +858,7 @@ function handleFileInputChange(event) {
                  file.name.toLowerCase().endsWith('.gif') ||
                  file.name.toLowerCase().endsWith('.webp') ||
                  file.name.toLowerCase().endsWith('.svg')) {
-            console.log('🖼️ Image file selected:', file.name);
+
             handleFileDetection(file.name, fileInput, detectAIPlatform(), 'image', file.size);
         }
     }
@@ -921,7 +921,7 @@ function handleFileDetection(filename, element, platform, fileType, fileSize = n
     const cooldownKey = `${filename}_${platform}_${fileType}`;
     
     if (lastFileProcessed === cooldownKey) {
-        console.log('⏱️ File already processed recently:', filename);
+
         return;
     }
     
@@ -935,7 +935,7 @@ function handleFileDetection(filename, element, platform, fileType, fileSize = n
         detectedAt: now
     };
     
-    console.log(`🎯 Processing ${fileType.toUpperCase()} file for analysis options:`, filename);
+    
 
     // Show appropriate analysis options
     if (fileType === 'pdf') {
@@ -1240,7 +1240,7 @@ function showPDFAnalysisNotification(filename, fileSize, platform) {
         }
     }, 30000);
     
-    console.log('📱 PDF analysis notification displayed');
+
 }
 
 function showExcelAnalysisNotification(filename, fileSize, platform) {
@@ -1408,7 +1408,7 @@ function showExcelAnalysisNotification(filename, fileSize, platform) {
         }
     }, 30000);
     
-    console.log('📱 Excel analysis notification displayed');
+
 }
 
 function showImageAnalysisNotification(filename, fileSize, platform) {
@@ -1576,28 +1576,28 @@ function showImageAnalysisNotification(filename, fileSize, platform) {
         }
     }, 30000);
     
-    console.log('📱 Image analysis notification displayed');
+
 }
 
 async function handlePDFOptionSelection(option, filename, fileSize, platform) {
-    console.log('📝 PDF option selected:', option, 'for file:', filename);
+
     
     try {
         // Generate contextual prompt (no credit check needed here - credits handled by backend)
         const prompt = getContextualizedPrompt(option, filename, fileSize);
-        console.log('✅ Generated prompt for', option);
-        console.log('📝 Prompt preview:', prompt.substring(0, 100) + '...');
+
+        
         
         // Insert prompt into input field
         await insertFileAnalysisPrompt(prompt, platform, 'pdf');
         
-        console.log('🎯 PDF analysis prompt ready for user to send');
+
         
     } catch (error) {
         console.error('❌ PDF option selection error:', error);
         // Show error in a simple way
         const errorMsg = 'Failed to process PDF analysis option: ' + error.message;
-        console.log('❌', errorMsg);
+
         
         // Try to show error in output if available
         if (shadowRoot && shadowRoot.querySelector('#output-text')) {
@@ -1609,24 +1609,24 @@ async function handlePDFOptionSelection(option, filename, fileSize, platform) {
 }
 
 async function handleExcelOptionSelection(option, filename, fileSize, platform) {
-    console.log('📊 Excel option selected:', option, 'for file:', filename);
+
     
     try {
         // Generate contextual prompt for Excel
         const prompt = getContextualizedPrompt(option, filename, fileSize, 'excel');
-        console.log('✅ Generated Excel prompt for', option);
-        console.log('📝 Prompt preview:', prompt.substring(0, 100) + '...');
+
+        
         
         // Insert prompt into input field
         await insertFileAnalysisPrompt(prompt, platform, 'excel');
         
-        console.log('🎯 Excel analysis prompt ready for user to send');
+
         
     } catch (error) {
         console.error('❌ Excel option selection error:', error);
         // Show error in a simple way
         const errorMsg = 'Failed to process Excel analysis option: ' + error.message;
-        console.log('❌', errorMsg);
+
         
         // Try to show error in output if available
         if (shadowRoot && shadowRoot.querySelector('#output-text')) {
@@ -1638,24 +1638,24 @@ async function handleExcelOptionSelection(option, filename, fileSize, platform) 
 }
 
 async function handleImageOptionSelection(option, filename, fileSize, platform) {
-    console.log('🖼️ Image option selected:', option, 'for file:', filename);
+
     
     try {
         // Generate contextual prompt for Image
         const prompt = getContextualizedPrompt(option, filename, fileSize, 'image');
-        console.log('✅ Generated Image prompt for', option);
-        console.log('📝 Prompt preview:', prompt.substring(0, 100) + '...');
+
+        
         
         // Insert prompt into input field
         await insertFileAnalysisPrompt(prompt, platform, 'image');
         
-        console.log('🎯 Image analysis prompt ready for user to send');
+
         
     } catch (error) {
         console.error('❌ Image option selection error:', error);
         // Show error in a simple way
         const errorMsg = 'Failed to process Image analysis option: ' + error.message;
-        console.log('❌', errorMsg);
+
         
         // Try to show error in output if available
         if (shadowRoot && shadowRoot.querySelector('#output-text')) {
@@ -1667,33 +1667,33 @@ async function handleImageOptionSelection(option, filename, fileSize, platform) 
 }
 
  async function insertFileAnalysisPrompt(prompt, platform, fileType = 'pdf') {
-    console.log(`📝 Inserting ${fileType.toUpperCase()} analysis prompt into input field...`);
-    console.log('🎯 Platform:', platform);
-    console.log('📄 Prompt length:', prompt.length);
-    console.log('📝 Prompt preview:', prompt.substring(0, 150) + '...');
+    
+
+
+    
     
     // Try to use magic pill input field first
     if (currentInputField) {
         try {
-            console.log('🎯 Trying magic pill input field...');
+
             
             if (fileType === 'code') {
                 // For code analysis, APPEND the prompt to existing content
                 const existingContent = getInputText(currentInputField);
                 const combinedContent = existingContent + '\n\n' + prompt;
                 setInputText(currentInputField, combinedContent);
-                console.log('✅ Code analysis prompt APPENDED to existing content');
+
             } else {
                 // For files (PDF, Excel, Images), REPLACE content as before
                 setInputText(currentInputField, prompt);
-                console.log(`✅ ${fileType.toUpperCase()} prompt inserted via magic pill input field`);
+                
             }
             return;
         } catch (error) {
-            console.log('❌ Failed to use magic pill input field:', error);
+
         }
     } else {
-        console.log('⚠️ No currentInputField available, using fallback detection');
+
     }
     
     // Fallback: detect input field manually
@@ -1728,11 +1728,11 @@ async function handleImageOptionSelection(option, filename, fileSize, platform) 
                 const existingContent = getInputText(inputField);
                 const combinedContent = existingContent + '\n\n' + prompt;
                 setInputText(inputField, combinedContent);
-                console.log('✅ Code analysis prompt APPENDED to existing content via fallback');
+
             } else {
                 // For files (PDF, Excel, Images), REPLACE content as before
                 setInputText(inputField, prompt);
-                console.log(`✅ ${fileType.toUpperCase()} prompt inserted via fallback detection`);
+                
             }
             inputField.focus();
         } catch (error) {
@@ -1742,25 +1742,25 @@ async function handleImageOptionSelection(option, filename, fileSize, platform) 
                 const existingContent = getInputText(inputField) || '[Your code here]';
                 const combinedContent = existingContent + '\n\n' + prompt;
                 navigator.clipboard.writeText(combinedContent).then(() => {
-                    console.log(`📋 Code analysis prompt with existing content copied to clipboard as fallback`);
+
                 });
             } else {
                 navigator.clipboard.writeText(prompt).then(() => {
-                    console.log(`📋 ${fileType.toUpperCase()} prompt copied to clipboard as fallback`);
+                    
                 });
             }
         }
     } else {
-        console.log(`❌ Could not find input field for ${fileType.toUpperCase()} prompt insertion`);
+        
         // Fallback: copy to clipboard
         if (fileType === 'code') {
             const fallbackContent = '[Your code here]\n\n' + prompt;
             navigator.clipboard.writeText(fallbackContent).then(() => {
-                console.log(`📋 Code analysis prompt copied to clipboard as fallback`);
+
             });
         } else {
             navigator.clipboard.writeText(prompt).then(() => {
-                console.log(`📋 ${fileType.toUpperCase()} prompt copied to clipboard as fallback`);
+                
             });
         }
     }
@@ -1785,7 +1785,7 @@ function positionMagicPillAtCursor(inputField) {
     const cursorPos = getCursorPosition(inputField);
     
     if (!cursorPos) {
-        console.log('❌ Could not get cursor position, using fallback');
+
         positionMagicPillFallback(inputField);
         return;
     }
@@ -1833,6 +1833,26 @@ function positionMagicPillFallback(inputField) {
 
 function createMagicPillIcon() {
     removeMagicPill();
+
+    // ✅ ADD THIS: Inject bounce animation into global document if not already present
+    if (!document.querySelector('#solthron-bounce-animation')) {
+        const style = document.createElement('style');
+        style.id = 'solthron-bounce-animation';
+        style.textContent = `
+            @keyframes bounce {
+                0%, 80%, 100% {
+                    transform: translateY(0) scale(1);
+                    opacity: 1;
+                }
+                40% {
+                    transform: translateY(-2px) scale(1.05);
+                    opacity: 0.9;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     
     magicPillIcon = document.createElement('div');
     magicPillIcon.id = 'solthron-magic-pill';
@@ -1985,7 +2005,7 @@ function showToneDropdown(x, y) {
         option.addEventListener('click', (e) => {
             e.stopPropagation();
             selectedEmailMode = mode.id;
-            console.log(`📧 Mode set to: ${mode.label}`);
+            console.log(`📧 Gmail tone mode set to: ${mode.label}`);
             
             // Save preference
             localStorage.setItem('solthron-email-mode', mode.id);
@@ -1996,6 +2016,8 @@ function showToneDropdown(x, y) {
                 toneDropdown.remove();
                 toneDropdown = null;
             }, 200);
+            
+            // ✅ ONLY set the mode - user must left-click Magic Pill to trigger enhancement
         });
         
         toneDropdown.appendChild(option);
@@ -2085,8 +2107,8 @@ async function proceedWithMagicPill(text, platform = null, tone = 'balanced') {
                     mode: tone || 'balanced' // Pass the selected mode (parameter name stays 'tone' for compatibility
                 }
             };
-            console.log('📧 Sending Gmail enhancement request with context:', emailContext);
-            console.log('📧 Using mode:', tone);
+
+
         } else {
             // Regular AI platform enhancement
             requestData = {
@@ -2098,14 +2120,14 @@ async function proceedWithMagicPill(text, platform = null, tone = 'balanced') {
             };
         }
         
-        console.log('🔍 Sending magic pill request:', requestData);
+
         
         const response = await new Promise((resolve, reject) => {
             chrome.runtime.sendMessage(requestData, response => {
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
                 } else {
-                    console.log('🔍 Raw response from background script:', response);
+
                     resolve(response);
                 }
             });
@@ -2113,7 +2135,7 @@ async function proceedWithMagicPill(text, platform = null, tone = 'balanced') {
         
         if (response && response.success && response.data) {
             const enhancedText = response.data.prompt || response.data.email;
-            console.log('✅ Enhanced text received');
+
             
             // Replace the text in the input field
             setInputText(currentInputField, enhancedText);
@@ -2172,16 +2194,16 @@ async function handleMagicPillClick(e) {  // Remove tone parameter
     lastMagicPillClick = now;
     
     const platform = detectAIPlatform();
-    console.log('🚀 Processing text with magic pill for platform:', platform);
+
     if (platform === 'gmail') {
-    console.log('📧 Using mode:', selectedEmailMode);
+
     }
     
     // Check credits
     const creditCheck = await checkCreditsWithWarnings('magic_pill_enhance');
     
     if (!creditCheck.success) {
-        console.log('❌ Magic pill credit check failed:', creditCheck.message);
+
         magicPillIcon.innerHTML = magicPillOriginalIcon;
         
         // Show login/upgrade prompt logic
@@ -2218,7 +2240,7 @@ async function handleMagicPillClick(e) {  // Remove tone parameter
     
     // Handle low credits warning
     if (creditCheck.showWarning) {
-        console.log('⚠️ Magic pill low credits warning:', creditCheck.warningMessage);
+
         magicPillIcon.innerHTML = magicPillOriginalIcon;
         
         const creditsAfter = creditCheck.availableCredits - creditCheck.requiredCredits;
@@ -2259,7 +2281,7 @@ async function handleMagicPillClick(e) {  // Remove tone parameter
 }
 
 function showMagicPillError(message) {
-    console.log('⚠️', message);
+
     magicPillIcon.style.background = '#ff6b6b';
     setTimeout(() => {
         magicPillIcon.style.background = '#ffff00';
@@ -3155,7 +3177,7 @@ function createUI() {
             border-radius: 50%;
             background: #ffff00;
             border: none;
-            cursor: move;
+            cursor: pointer;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2), 0 0 20px rgba(255, 255, 0, 0.3);
             display: flex;
             align-items: center;
@@ -4539,8 +4561,6 @@ function initializeUIHandlers() {
     let isDragging = false;
     let currentX;
     let currentY;
-    let clickCount = 0;
-    let clickTimer = null;
     let lastResult = localStorage.getItem('solthron-last-result');
 
     const copyBtn = shadowRoot.querySelector('#copy-btn');
@@ -4576,49 +4596,39 @@ function initializeUIHandlers() {
     });
 
     button.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        clickCount++;
+    e.stopPropagation();
+    
+    if (!isDragging) {
+        triggerDoubleClickAnimation();
+        
+        const selectedText = window.getSelection().toString().trim();
 
-        if (clickCount === 1) {
-            clickTimer = setTimeout(() => {
-                clickCount = 0;
-            }, 300);
-        } else if (clickCount === 2) {
-            clearTimeout(clickTimer);
-            clickCount = 0;
-            
-            triggerDoubleClickAnimation();
-            
-            if (!isDragging) {
-                const selectedText = window.getSelection().toString().trim();
-
-                if (!selectedText || selectedMode === 'image' || selectedMode === 'smart_followups' || selectedMode === 'smart_actions') {
-                    if (lastResult && selectedMode !== 'smart_followups' && selectedMode !== 'smart_actions' && selectedMode !== 'smart_enhancements') {
-                        outputText.classList.remove('placeholder');
-                        outputText.textContent = lastResult;
-                    } else {
-                        outputText.classList.add('placeholder');
-                        const placeholderMessages = {
-                            image_prompt: 'Right-click an image to generate a prompt...',
-                            save_note: 'Highlight text and double-click to save as note...',
-                            save_prompt: 'Highlight text and double-click to save as prompt...',
-                            save_persona: 'Highlight text and double-click to save as persona...',
-                            smart_followups: 'Right-click on an AI chat page to generate follow-up questions...',
-                            default: 'Highlight text to begin...'
-                        };
-                        outputText.textContent = placeholderMessages[selectedMode] || placeholderMessages.default;
-                    }
-                    const buttonRect = button.getBoundingClientRect();
-                    solthronContainer.style.display = 'block';
-                    solthronContainer.style.pointerEvents = 'auto';
-                    positionContainer(buttonRect);
-                    return;
-                }
-                
-                await processSelectedText(selectedText);
+        if (!selectedText || selectedMode === 'image' || selectedMode === 'smart_followups' || selectedMode === 'smart_actions') {
+            if (lastResult && selectedMode !== 'smart_followups' && selectedMode !== 'smart_actions' && selectedMode !== 'smart_enhancements') {
+                outputText.classList.remove('placeholder');
+                outputText.textContent = lastResult;
+            } else {
+                outputText.classList.add('placeholder');
+                const placeholderMessages = {
+                    image_prompt: 'Right-click an image to generate a prompt...',
+                    save_note: 'Highlight text and click to save as note...',
+                    save_prompt: 'Highlight text and click to save as prompt...',
+                    save_persona: 'Highlight text and click to save as persona...',
+                    smart_followups: 'Right-click on an AI chat page to generate follow-up questions...',
+                    default: 'Highlight text to begin...'
+                };
+                outputText.textContent = placeholderMessages[selectedMode] || placeholderMessages.default;
             }
+            const buttonRect = button.getBoundingClientRect();
+            solthronContainer.style.display = 'block';
+            solthronContainer.style.pointerEvents = 'auto';
+            positionContainer(buttonRect);
+            return;
         }
-    });
+        
+        await processSelectedText(selectedText);
+    }
+});
 
     modeSelect.addEventListener('change', (e) => {
         selectedMode = e.target.value;
@@ -4630,7 +4640,7 @@ function initializeUIHandlers() {
         if (isRightClickMode) {
             rightClickFeaturesEnabled = true;
             lastSelectedRightClickMode = selectedMode;
-            console.log(`🎯 Right-click feature enabled: ${selectedMode}`);
+
         } else {
             // Non-right-click modes disable right-click features
             rightClickFeaturesEnabled = false;
@@ -4715,12 +4725,12 @@ function initializeUIHandlers() {
     // ========== MAGIC PILL AUTO-INITIALIZATION ==========
     // Load saved preference and initialize magic pill automatically
     autoModeEnabled = true; // Always enabled
-    console.log('🪄 Magic Pill auto-enabled');
+
     
     // Initialize magic pill immediately for supported platforms
     const currentPlatform = detectAIPlatform();
     if (currentPlatform !== 'unknown') {
-        console.log(`🎯 Auto-initializing magic pill for ${currentPlatform}`);
+
         setTimeout(() => {
             initializeMagicPill();
         }, 1000);
@@ -4880,12 +4890,12 @@ function createAuthIframe(type = 'signup') {
         // Listen for auth success
         // Listen for auth success
 const messageHandler = (event) => {
-    console.log('📩 Received message:', event.origin, event.data);
+
     
     if ((event.origin === 'https://solthron.com' || event.origin === 'https://www.solthron.com') && 
         event.data.type === 'SOLTHRON_AUTH_SUCCESS') {
         
-        console.log('✅ Auth success message received');
+
         
         // Clean up
         try {
@@ -4896,7 +4906,7 @@ const messageHandler = (event) => {
                 document.body.removeChild(backdrop);
             }
         } catch (e) {
-            console.log('Cleanup error:', e);
+
         }
         
         window.removeEventListener('message', messageHandler);
@@ -4950,7 +4960,7 @@ shadowRoot.getElementById('google-signup-btn').addEventListener('click', async (
         // Update UI
         updateProfileView(true);
         
-        console.log('✅ Google signup successful!');
+
         
     } catch (error) {
         console.error('Google signup error:', error);
@@ -4995,7 +5005,7 @@ shadowRoot.getElementById('google-login-btn').addEventListener('click', async (e
         // Update UI
         updateProfileView(true);
         
-        console.log('✅ Google login successful!');
+
         
     } catch (error) {
         console.error('Google login error:', error);
@@ -5172,7 +5182,7 @@ document.addEventListener('contextmenu', async (e) => {
     
     if (isImage(target) && selectedMode === 'image_prompt') {
         e.preventDefault();
-        console.log('🖼️ Processing image with right-click (feature enabled)');
+        
         showShimmerLoading('Processing image...');
         solthronContainer.style.display = 'block';
         solthronContainer.style.pointerEvents = 'auto';
@@ -5190,13 +5200,9 @@ document.addEventListener('contextmenu', async (e) => {
         }
         
         e.preventDefault();
-        console.log('🤖 Processing smart followups with right-click (feature enabled)');
         
         const conversation = extractConversation();
-        console.log("=== DEBUG: EXTRACTED CONVERSATION ===");
-        console.log(conversation);
-        console.log("=== END DEBUG ===");
-        
+
         if (!conversation || conversation === 'Unable to extract conversation from this page.') {
             showError('Unable to extract conversation. Please ensure there is a conversation visible on the page.');
             solthronContainer.style.display = 'block';
@@ -5309,7 +5315,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             // Disable right-click features when extension is hidden
             rightClickFeaturesEnabled = false;
             lastSelectedRightClickMode = null;
-            console.log('🔒 Right-click features disabled (extension hidden)');
+            
             
             if (solthronContainer.style.display === 'block') {
                 solthronContainer.style.display = 'none';
@@ -5321,7 +5327,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (isRightClickMode) {
                 rightClickFeaturesEnabled = true;
                 lastSelectedRightClickMode = selectedMode;
-                console.log(`🎯 Right-click feature re-enabled: ${selectedMode}`);
+
             }
         }
         
@@ -5351,18 +5357,18 @@ window.addEventListener('message', async (event) => {
     }
     
     if (event.data.type === 'SOLTHRON_AUTH_SUCCESS' && event.data.token) {
-        console.log('🔐 Received auth token from website');
-        console.log('📍 Token source:', event.data.source);
+
+
         
         try {
             const success = await BackendAuth.setAuthToken(event.data.token);
             if (success) {
-                console.log('✅ Auth token stored successfully');
+
                 pageCredits = null;
                 
                 const profileView = shadowRoot.getElementById('profile-view');
                 if (profileView && profileView.style.display !== 'none') {
-                    console.log('🔄 Profile view is open, should refresh');
+
                 }
                 
             } else {
@@ -5384,22 +5390,22 @@ window.solthronDebug = {
         const isLoggedIn = await BackendAuth.isLoggedIn();
         const credits = await BackendAuth.getUserCredits();
         
-        console.log('🔍 Auth Debug Info:');
-        console.log('Has Token:', !!hasToken);
-        console.log('Is Logged In:', isLoggedIn);
-        console.log('Credits:', credits);
+
+
+
+
         
         return { hasToken: !!hasToken, isLoggedIn, credits };
     },
     
     clearAuth: async function() {
         await BackendAuth.logout();
-        console.log('🧹 Auth cleared');
+
     }
 };
 
 // ✅ INITIALIZE THE EXTENSION
-console.log('🚀 Solthron Extension loaded with Magic Pill + Auto Smart Actions');
+
 createUI();
 initializeProfileHandlers();
 
@@ -5408,13 +5414,13 @@ initializeProfileHandlers();
 setTimeout(() => {
     const platform = detectAIPlatform();
     if (platform !== 'unknown') {
-        console.log('🎯 Initializing Magic Pill...');
+
         initializeMagicPill();
         
         if (platform === 'gmail') {
-            console.log('📧 Gmail detected - Magic Pill ready for email enhancement');
+
         } else {
-            console.log('📄 Initializing File Analysis (PDF, Excel & Images)...');
+            
             initializeFileAnalysis();
         }
     }
@@ -5425,11 +5431,11 @@ setInterval(() => {
     const platform = detectAIPlatform();
     if (platform !== 'unknown') {
         if (autoModeEnabled && !currentInputField) {
-            console.log('🔄 Rechecking Magic Pill...');
+
             initializeMagicPill();
         }
         if (fileAnalysisEnabled) {
-            console.log('🔄 File Analysis monitoring active (PDF, Excel & Images)...');
+            
         }
         
     }
