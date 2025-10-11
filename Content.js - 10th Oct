@@ -53,6 +53,12 @@ let fileAnalysisNotification = null;
 let lastFileProcessed = null;
 const FILE_ANALYSIS_COOLDOWN = 3000; // 3 seconds cooldown between file analyses
 
+// ========== @MENTIONS AUTOCOMPLETE VARIABLES ==========
+let autocompleteDropdown = null;
+let autocompleteMatches = [];
+let selectedAutocompleteIndex = 0;
+let lastAtPosition = -1;
+
 // ✨ Double-click animation function
 function triggerDoubleClickAnimation() {
     const solthronButton = shadowRoot.querySelector('.solthron-button');
@@ -501,8 +507,9 @@ function monitorInputField(platform) {
 }
 
 // ✅ FIX: Enhanced attachment that handles field replacement
+// ✅ FIX: Enhanced attachment that handles field replacement AND autocomplete
 function attachMagicPillToInput(inputField) {
-
+    console.log('🔗 Attaching Magic Pill + Autocomplete to input field');
     
     // ✅ FIX: Always remove existing listeners first (even if field is different)
     if (currentInputField && currentInputField !== inputField) {
@@ -513,9 +520,11 @@ function attachMagicPillToInput(inputField) {
             currentInputField.removeEventListener('keyup', handleCursorMove);
             currentInputField.removeEventListener('click', handleCursorMove);
             currentInputField.removeEventListener('keydown', handleKeyboardShortcut);
-
+            currentInputField.removeEventListener('keydown', handleAutocompleteKeydown);
+            currentInputField.removeEventListener('input', handleAutocompleteInput);
+            console.log('🧹 Removed old listeners from previous field');
         } catch (error) {
-            
+            console.warn('⚠️ Error removing old listeners:', error);
         }
     }
     
@@ -527,9 +536,14 @@ function attachMagicPillToInput(inputField) {
         inputField.addEventListener('keyup', handleCursorMove);
         inputField.addEventListener('click', handleCursorMove);
         inputField.addEventListener('keydown', handleKeyboardShortcut);
-
+        
+        // ✅ NEW: Add autocomplete listeners
+        inputField.addEventListener('keydown', handleAutocompleteKeydown, true); // Use capture phase
+        inputField.addEventListener('input', handleAutocompleteInput);
+        
+        console.log('✅ Attached all listeners (Magic Pill + Autocomplete) to new field');
     } catch (error) {
-        console.error('❌ Failed to attach magic pill listeners:', error);
+        console.error('❌ Failed to attach listeners:', error);
     }
 }
 
@@ -2305,7 +2319,425 @@ function removeMagicPill() {
         currentInputField.removeEventListener('keyup', handleCursorMove);
         currentInputField.removeEventListener('click', handleCursorMove);
         currentInputField.removeEventListener('keydown', handleKeyboardShortcut);
+        
+        // ✅ NEW: Remove autocomplete listeners
+        currentInputField.removeEventListener('keydown', handleAutocompleteKeydown);
+        currentInputField.removeEventListener('input', handleAutocompleteInput);
+        
         currentInputField = null;
+    }
+    
+    // ✅ NEW: Hide autocomplete dropdown
+    hideAutocompleteDropdown();
+}
+
+// ========== @MENTIONS AUTOCOMPLETE SYSTEM ==========
+
+async function searchSavedItems(query) {
+    try {
+        const prompts = await loadPrompts();
+        const notes = await loadNotes();
+        const personas = await loadPersonaTemplates();
+        
+        const allItems = [
+            ...prompts.map(p => ({...p, type: 'prompt', icon: '📝', category: 'Prompt'})),
+            ...notes.map(n => ({...n, type: 'note', icon: '📋', category: 'Note'})),
+            ...personas.map(p => ({...p, type: 'persona', icon: '🎭', category: 'Persona'}))
+        ];
+        
+        if (!query) {
+            return allItems.slice(0, 8); // Show first 8 if no query
+        }
+        
+        // Fuzzy search
+        return allItems.filter(item => 
+            item.title.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 8); // Max 8 results
+        
+    } catch (error) {
+        console.error('Error searching saved items:', error);
+        return [];
+    }
+}
+
+function createAutocompleteDropdown() {
+    if (autocompleteDropdown) {
+        autocompleteDropdown.remove();
+    }
+    
+    autocompleteDropdown = document.createElement('div');
+    autocompleteDropdown.id = 'solthron-autocomplete';
+    autocompleteDropdown.style.cssText = `
+        position: absolute;
+        background: #2a2a2a;
+        border: 2px solid rgba(255, 215, 0, 0.4);
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        max-height: 280px;
+        overflow-y: auto;
+        z-index: 9999999;
+        min-width: 300px;
+        display: none;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    // Add scrollbar styling
+    const style = document.createElement('style');
+    style.textContent = `
+        #solthron-autocomplete::-webkit-scrollbar {
+            width: 6px;
+        }
+        #solthron-autocomplete::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        #solthron-autocomplete::-webkit-scrollbar-thumb {
+            background: rgba(255, 215, 0, 0.3);
+            border-radius: 3px;
+        }
+        #solthron-autocomplete::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 215, 0, 0.5);
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(autocompleteDropdown);
+    return autocompleteDropdown;
+}
+
+function renderAutocompleteItems(matches) {
+    if (!autocompleteDropdown) {
+        createAutocompleteDropdown();
+    }
+    
+    autocompleteDropdown.innerHTML = '';
+    
+    if (matches.length === 0) {
+        const emptyState = document.createElement('div');
+        emptyState.style.cssText = `
+            padding: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: center;
+            font-size: 12px;
+        `;
+        emptyState.textContent = 'No saved items found';
+        autocompleteDropdown.appendChild(emptyState);
+        return;
+    }
+    
+    matches.forEach((item, index) => {
+        const option = document.createElement('div');
+        option.className = 'autocomplete-option';
+        option.dataset.index = index;
+        
+        const isSelected = index === selectedAutocompleteIndex;
+        
+        option.style.cssText = `
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid ${isSelected ? '#ffd700' : 'transparent'};
+            background: ${isSelected ? 'rgba(255, 215, 0, 0.1)' : 'transparent'};
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        
+        option.innerHTML = `
+            <span style="font-size: 16px; flex-shrink: 0;">${item.icon}</span>
+            <div style="flex: 1; overflow: hidden;">
+                <div style="
+                    color: rgba(255, 255, 255, 0.9);
+                    font-size: 13px;
+                    font-weight: 500;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                ">${item.title}</div>
+                <div style="
+                    color: rgba(255, 255, 255, 0.5);
+                    font-size: 11px;
+                    margin-top: 2px;
+                ">${item.category}</div>
+            </div>
+            <div style="
+                color: rgba(255, 215, 0, 0.6);
+                font-size: 11px;
+                flex-shrink: 0;
+            ">↵</div>
+        `;
+        
+        option.addEventListener('mouseenter', () => {
+            selectedAutocompleteIndex = index;
+            renderAutocompleteItems(autocompleteMatches);
+        });
+        
+        option.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🖱️ Mousedown on option:', item.title);
+          insertAutocompleteItem(item);
+});
+
+        option.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🖱️ Click on option:', item.title);
+          insertAutocompleteItem(item);
+});
+        
+        autocompleteDropdown.appendChild(option);
+    });
+}
+
+function positionAutocompleteDropdown() {
+    if (!autocompleteDropdown || !currentInputField) return;
+    
+    const cursorPos = getCursorPosition(currentInputField);
+    
+    if (cursorPos) {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        // Position below cursor
+        let x = cursorPos.x + scrollLeft;
+        let y = cursorPos.y + scrollTop + (cursorPos.height || 20) + 5;
+        
+        // Viewport boundary checks
+        const dropdownWidth = 300;
+        const dropdownHeight = Math.min(280, autocompleteMatches.length * 60);
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Adjust horizontal position if needed
+        if (x + dropdownWidth > viewportWidth + scrollLeft - 10) {
+            x = viewportWidth + scrollLeft - dropdownWidth - 10;
+        }
+        
+        // Adjust vertical position if needed (show above cursor if not enough space below)
+        if (y + dropdownHeight > viewportHeight + scrollTop - 10) {
+            y = cursorPos.y + scrollTop - dropdownHeight - 5;
+        }
+        
+        autocompleteDropdown.style.left = `${x}px`;
+        autocompleteDropdown.style.top = `${y}px`;
+    } else {
+        // Fallback positioning
+        const rect = currentInputField.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        autocompleteDropdown.style.left = `${rect.left + scrollLeft}px`;
+        autocompleteDropdown.style.top = `${rect.bottom + scrollTop + 5}px`;
+    }
+}
+
+async function showAutocompleteDropdown(searchTerm) {
+    autocompleteMatches = await searchSavedItems(searchTerm);
+    selectedAutocompleteIndex = 0;
+    
+    if (!autocompleteDropdown) {
+        createAutocompleteDropdown();
+    }
+    
+    renderAutocompleteItems(autocompleteMatches);
+    positionAutocompleteDropdown();
+    autocompleteDropdown.style.display = 'block';
+}
+
+function hideAutocompleteDropdown() {
+    if (autocompleteDropdown) {
+        autocompleteDropdown.style.display = 'none';
+    }
+    autocompleteMatches = [];
+    selectedAutocompleteIndex = 0;
+    lastAtPosition = -1;
+}
+
+function insertAutocompleteItem(item) {
+    if (!currentInputField) {
+        console.error('❌ No currentInputField available');
+        return;
+    }
+    
+    console.log('🎯 Starting insertion for:', item.title);
+    console.log('📋 Item type:', item.type);
+    console.log('🔧 Input element:', currentInputField.tagName);
+    
+    const input = currentInputField;
+    const platform = detectAIPlatform();
+    
+    // Get content to insert
+    let contentToInsert = '';
+    if (item.type === 'persona') {
+        contentToInsert = item.prompt;
+    } else {
+        contentToInsert = item.text;
+    }
+    
+    console.log('📝 Content to insert (first 100 chars):', contentToInsert.substring(0, 100));
+    
+    try {
+        // Get current text using your existing helper
+        const currentText = getInputText(input);
+        console.log('📄 Current text length:', currentText.length);
+        
+        // Find the @ position
+        const atIndex = currentText.lastIndexOf('@');
+        console.log('📍 @ symbol found at index:', atIndex);
+        
+        let newText;
+        if (atIndex !== -1) {
+            // Find where the @mention ends (space, newline, or end of text)
+            let mentionEnd = atIndex + 1;
+            while (mentionEnd < currentText.length && 
+                   currentText[mentionEnd] !== ' ' && 
+                   currentText[mentionEnd] !== '\n') {
+                mentionEnd++;
+            }
+            
+            console.log('📍 Mention ends at index:', mentionEnd);
+            
+            // Build new text: before @ + content + after mention
+            newText = currentText.substring(0, atIndex) + 
+                     contentToInsert + 
+                     currentText.substring(mentionEnd);
+        } else {
+            console.warn('⚠️ No @ found, appending to end');
+            newText = currentText + '\n\n' + contentToInsert;
+        }
+        
+        console.log('✏️ Setting new text (length:', newText.length, ')');
+        
+        // Use your existing setInputText function
+        setInputText(input, newText);
+        
+        console.log('✅ Text set successfully');
+        
+        // Force focus back to input
+        setTimeout(() => {
+            input.focus();
+            console.log('🎯 Focus restored to input');
+        }, 100);
+        
+    } catch (error) {
+        console.error('❌ Error during insertion:', error);
+        console.error('Error stack:', error.stack);
+    }
+    
+    // Hide dropdown
+    hideAutocompleteDropdown();
+    console.log('✅ Insertion complete, dropdown hidden');
+}
+
+function getTextOffset(element, node, offset) {
+    let textOffset = 0;
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    let currentNode;
+    while (currentNode = walker.nextNode()) {
+        if (currentNode === node) {
+            return textOffset + offset;
+        }
+        textOffset += currentNode.textContent.length;
+    }
+    
+    return textOffset;
+}
+
+function handleAutocompleteKeydown(e) {
+    if (!autocompleteDropdown || autocompleteDropdown.style.display === 'none') {
+        return false;
+    }
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            selectedAutocompleteIndex = Math.min(
+                selectedAutocompleteIndex + 1,
+                autocompleteMatches.length - 1
+            );
+            renderAutocompleteItems(autocompleteMatches);
+            
+            // Scroll into view
+            const selectedOption = autocompleteDropdown.querySelector(`[data-index="${selectedAutocompleteIndex}"]`);
+            if (selectedOption) {
+                selectedOption.scrollIntoView({ block: 'nearest' });
+            }
+            return true;
+            
+        case 'ArrowUp':
+            e.preventDefault();
+            selectedAutocompleteIndex = Math.max(selectedAutocompleteIndex - 1, 0);
+            renderAutocompleteItems(autocompleteMatches);
+            
+            // Scroll into view
+            const selectedOptionUp = autocompleteDropdown.querySelector(`[data-index="${selectedAutocompleteIndex}"]`);
+            if (selectedOptionUp) {
+                selectedOptionUp.scrollIntoView({ block: 'nearest' });
+            }
+            return true;
+            
+        case 'Enter':
+            if (autocompleteMatches.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                insertAutocompleteItem(autocompleteMatches[selectedAutocompleteIndex]);
+                return true;
+            }
+            break;
+            
+        case 'Escape':
+            e.preventDefault();
+            hideAutocompleteDropdown();
+            return true;
+            
+        case 'Tab':
+            if (autocompleteMatches.length > 0) {
+                e.preventDefault();
+                insertAutocompleteItem(autocompleteMatches[selectedAutocompleteIndex]);
+                return true;
+            }
+            break;
+    }
+    
+    return false;
+}
+
+async function handleAutocompleteInput(e) {
+    const input = e.target;
+    let text, cursorPos;
+    
+    if (input.tagName === 'TEXTAREA') {
+        text = input.value;
+        cursorPos = input.selectionStart;
+    } else {
+        text = input.innerText || input.textContent || '';
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            cursorPos = getTextOffset(input, range.startContainer, range.startOffset);
+        } else {
+            cursorPos = text.length;
+        }
+    }
+    
+    const textBefore = text.substring(0, cursorPos);
+    
+    // Check for @ trigger with optional search term
+    const atMatch = textBefore.match(/@([\w\s]*)$/);
+    
+    if (atMatch) {
+        const searchTerm = atMatch[1];
+        lastAtPosition = textBefore.lastIndexOf('@');
+        await showAutocompleteDropdown(searchTerm);
+    } else {
+        hideAutocompleteDropdown();
     }
 }
 
