@@ -5104,6 +5104,37 @@ function attachGalleryEventListeners(galleryList) {
                 outline: none;
                 box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
             `;
+
+            // ✅ NEW: Prevent Claude (and other platforms) from stealing keyboard input
+input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('keypress', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('keyup', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('input', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
             
             // ✅ NEW: Create Save button
             const saveBtn = document.createElement('button');
@@ -5235,29 +5266,52 @@ function attachGalleryEventListeners(galleryList) {
             });
             
             // Event listeners for input
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    saveRename();
-                } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    cancelRename();
-                }
-            });
-            
-            input.addEventListener('keypress', (e) => e.stopPropagation());
-            input.addEventListener('keyup', (e) => e.stopPropagation());
-            input.addEventListener('input', (e) => e.stopPropagation());
-            
-            input.addEventListener('blur', () => {
-                setTimeout(() => {
-                    if (textElement.contains(inputWrapper)) {
-                        saveRename();
-                    }
-                }, 200);
-            });
+            // Event listeners for input - ENHANCED for Claude compatibility
+input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        saveRename();
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelRename();
+    }
+}, true);
+
+input.addEventListener('keypress', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('keyup', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('input', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('blur', () => {
+    setTimeout(() => {
+        if (textElement.contains(inputWrapper)) {
+            saveRename();
+        }
+    }, 200);
+});
+
+input.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
+
+input.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+}, true);
             
             input.addEventListener('click', (e) => e.stopPropagation());
             input.addEventListener('mousedown', (e) => e.stopPropagation());
