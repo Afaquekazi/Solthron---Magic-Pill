@@ -529,6 +529,7 @@ function attachMagicPillToInput(inputField) {
         // ✅ NEW: Add autocomplete listeners
         inputField.addEventListener('keydown', handleAutocompleteKeydown, true); // Use capture phase
         inputField.addEventListener('input', handleAutocompleteInput);
+        inputField.addEventListener('keydown', handleQuickSave, true); // Quick save listener
         
         console.log('✅ Attached all listeners (Magic Pill + Autocomplete) to new field');
     } catch (error) {
@@ -1220,6 +1221,7 @@ function removeMagicPill() {
         // ✅ NEW: Remove autocomplete listeners
         currentInputField.removeEventListener('keydown', handleAutocompleteKeydown);
         currentInputField.removeEventListener('input', handleAutocompleteInput);
+        currentInputField.removeEventListener('keydown', handleQuickSave);
         
         currentInputField = null;
     }
@@ -1545,6 +1547,68 @@ function getTextOffset(element, node, offset) {
     }
     
     return textOffset;
+}
+
+// ========== QUICK SAVE FUNCTION (Ctrl+Shift+S) ==========
+// ========== QUICK SAVE FUNCTION (Alt+S) ==========
+function handleQuickSave(e) {
+    // Check for Alt+S
+    if (e.altKey && e.key === 's') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Try to get highlighted text first
+        let text = window.getSelection().toString().trim();
+        
+        // If no highlighted text, get text from input field
+        if (!text && e.target) {
+            text = getInputText(e.target);
+        }
+        
+        if (text.trim().length > 0) {
+            console.log('💾 Quick save triggered');
+            
+            // Save directly to prompts
+            savePrompt(text).then(success => {
+                if (success) {
+                    // Show visual feedback
+                    showQuickSaveFeedback();
+                }
+            });
+        } else {
+            console.log('⚠️ No text to save');
+        }
+    }
+}
+
+function showQuickSaveFeedback() {
+    // Create temporary notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        background: rgba(0, 255, 0, 0.9);
+        color: black;
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        z-index: 999999;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = '✓ Saved to Prompts';
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(10px)';
+        notification.style.transition = 'all 0.3s ease';
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 1800);
 }
 
 function handleAutocompleteKeydown(e) {
@@ -3570,6 +3634,17 @@ function createUI() {
             animation: spin 1s linear infinite;
         }
 
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @keyframes bounce {
     0%, 80%, 100% {
         transform: translateY(0) scale(1);
@@ -5180,6 +5255,27 @@ window.solthronDebug = {
 
     }
 };
+
+// ========== GLOBAL QUICK SAVE LISTENER ==========
+// Works anywhere on the page when text is highlighted
+document.addEventListener('keydown', (e) => {
+    if (e.altKey && e.key === 's') {
+        const selectedText = window.getSelection().toString().trim();
+        
+        if (selectedText && selectedText.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('💾 Global quick save triggered');
+            
+            savePrompt(selectedText).then(success => {
+                if (success) {
+                    showQuickSaveFeedback();
+                }
+            });
+        }
+    }
+}, true); // Use capture phase
 
 // ✅ INITIALIZE THE EXTENSION
 
