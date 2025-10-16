@@ -12,6 +12,8 @@ let isStarActive = false;
 let isButtonVisible = false;
 let activePromptId = null;
 let isPromptStarActive = false;
+let activeChatId = null;
+let isChatStarActive = false;
 // Right-click feature state tracking
 let rightClickFeaturesEnabled = false;
 let lastSelectedRightClickMode = null;
@@ -2296,19 +2298,70 @@ async function deletePersona(personaId) {
 
 // ========== SAVE CHAT EXCHANGE ==========
 async function saveChatExchange(exchangeData) {
-    try {
-        const data = await chrome.storage.local.get('savedChats');
-        const savedChats = data.savedChats || [];
-        
-        savedChats.push(exchangeData);
-        
-        await chrome.storage.local.set({ savedChats });
-        
-        console.log('✅ Chat exchange saved:', exchangeData.title);
-        return true;
-    } catch (error) {
-        console.error('❌ Error saving chat exchange:', error);
-        return false;
+    // ✅ Check if a chat is starred/active (append mode)
+    if (isChatStarActive && activeChatId) {
+        try {
+            const data = await chrome.storage.local.get('savedChats');
+            const savedChats = data.savedChats || [];
+            const chatIndex = savedChats.findIndex(chat => chat.id === activeChatId);
+            
+            if (chatIndex !== -1) {
+                // Append to existing chat in Q&A format
+                const newExchange = `\n\n---\n\nQ: ${exchangeData.question}\nA: ${exchangeData.answer}`;
+                
+                // Check if the original format is Q&A style or old format
+                const isOldFormat = !savedChats[chatIndex].question.startsWith('Q: ');
+                
+                if (isOldFormat) {
+                    // Convert old format to new Q&A format
+                    savedChats[chatIndex].question = `Q: ${savedChats[chatIndex].question}\nA: ${savedChats[chatIndex].answer}`;
+                    savedChats[chatIndex].answer = ''; // Clear answer field (no longer needed)
+                }
+                
+                // Append new exchange
+                savedChats[chatIndex].question += newExchange;
+                
+                // Update metadata
+                savedChats[chatIndex].date = new Date().toISOString(); // Update timestamp
+                // Keep original chatLink (Option A from before)
+                
+                // Update detection flags
+                savedChats[chatIndex].hasCode = savedChats[chatIndex].hasCode || exchangeData.hasCode;
+                if (exchangeData.language && !savedChats[chatIndex].language) {
+                    savedChats[chatIndex].language = exchangeData.language;
+                }
+                
+                await chrome.storage.local.set({ savedChats });
+                console.log('✅ Appended to chat:', savedChats[chatIndex].title);
+                return true;
+            }
+        } catch (error) {
+            console.error('❌ Error appending to chat:', error);
+            return false;
+        }
+    } else {
+        // Create new chat in Q&A format
+        try {
+            const data = await chrome.storage.local.get('savedChats');
+            const savedChats = data.savedChats || [];
+            
+            // ✅ Format new chats in Q&A style
+            const formattedData = {
+                ...exchangeData,
+                question: `Q: ${exchangeData.question}\nA: ${exchangeData.answer}`,
+                answer: '' // Empty since we're storing both in question field
+            };
+            
+            savedChats.push(formattedData);
+            
+            await chrome.storage.local.set({ savedChats });
+            
+            console.log('✅ Chat exchange saved:', formattedData.title);
+            return true;
+        } catch (error) {
+            console.error('❌ Error saving chat exchange:', error);
+            return false;
+        }
     }
 }
 
@@ -4236,33 +4289,38 @@ function renderGalleryList(items, searchTerm = '') {
         }
         
         if (currentCategory === 'chats') {
-            return `
-                <div class="gallery-item" data-id="${item.id}">
-                    <div class="gallery-item-text" data-id="${item.id}">${item.title || 'Untitled Chat'}</div>
-                    <div class="gallery-item-actions">
-                        <button class="gallery-rename-btn" data-id="${item.id}" title="Rename">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                        </button>
-                        <button class="gallery-copy-btn" data-id="${item.id}">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                            </svg>
-                        </button>
-                        <button class="gallery-delete-btn" data-id="${item.id}">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18"></path>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
+    return `
+        <div class="gallery-item" data-id="${item.id}">
+            <div class="gallery-item-text" data-id="${item.id}">${item.title || 'Untitled Chat'}</div>
+            <div class="gallery-item-actions">
+                <button class="gallery-star-btn ${activeChatId === item.id ? 'active' : ''}" data-id="${item.id}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="${activeChatId === item.id ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                </button>
+                <button class="gallery-rename-btn" data-id="${item.id}" title="Rename">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+                <button class="gallery-copy-btn" data-id="${item.id}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    </svg>
+                </button>
+                <button class="gallery-delete-btn" data-id="${item.id}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `;
+}
  
         // ✅ UPDATED: Star icon now shows for BOTH notes AND prompts
         return `
@@ -4322,12 +4380,22 @@ function attachGalleryEventListeners(galleryList) {
                     hideShimmerLoading();
                     
                     if (currentCategory === 'personas') {
-                        outputText.textContent = `Title: ${selectedItem.title}\n\nPrompt: ${selectedItem.prompt}\n\nExample: ${selectedItem.example}\n\nResponse: ${selectedItem.response}`;
-                    } else if (currentCategory === 'chats') {
-                        outputText.textContent = `Question: ${selectedItem.question}\n\nAnswer: ${selectedItem.answer}\n\nPlatform: ${selectedItem.ai}\nDate: ${new Date(selectedItem.date).toLocaleString()}\n\n${selectedItem.hasCode ? '📝 Contains code' : ''}${selectedItem.chatLink ? '\n🔗 ' + selectedItem.chatLink : ''}`;
-                    } else {
-                        outputText.textContent = selectedItem.text;
-                    }
+    outputText.textContent = `Title: ${selectedItem.title}\n\nPrompt: ${selectedItem.prompt}\n\nExample: ${selectedItem.example}\n\nResponse: ${selectedItem.response}`;
+} else if (currentCategory === 'chats') {
+    // Check if it's new Q&A format or old format
+    const isQAFormat = selectedItem.question.includes('Q: ') && selectedItem.question.includes('A: ');
+    
+    if (isQAFormat) {
+        // New format: display as-is
+        outputText.textContent = `${selectedItem.question}\n\n---\n\nPlatform: ${selectedItem.ai}\nDate: ${new Date(selectedItem.date).toLocaleString()}\n\n${selectedItem.hasCode ? '📝 Contains code' : ''}${selectedItem.chatLink ? '\n🔗 ' + selectedItem.chatLink : ''}`;
+    } else {
+        // Old format: display with labels
+        outputText.textContent = `Question: ${selectedItem.question}\n\nAnswer: ${selectedItem.answer}\n\nPlatform: ${selectedItem.ai}\nDate: ${new Date(selectedItem.date).toLocaleString()}\n\n${selectedItem.hasCode ? '📝 Contains code' : ''}${selectedItem.chatLink ? '\n🔗 ' + selectedItem.chatLink : ''}`;
+    }
+} else {
+    // For notes and prompts
+    outputText.textContent = selectedItem.text;
+}
                     
                     closeAllSections();
                     outputText.classList.remove('placeholder', 'shimmer-loading', 'error');
@@ -4626,55 +4694,74 @@ input.addEventListener('mousedown', (e) => {
     });
 
     // Star button functionality (notes only)
-    // Star button functionality (notes AND prompts)
-    if (currentCategory === 'notes' || currentCategory === 'prompts') {
-        galleryList.querySelectorAll('.gallery-star-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const itemId = btn.dataset.id;
-                
-                if (currentCategory === 'notes') {
-                    // Notes star logic
-                    if (activeNoteId === itemId) {
-                        activeNoteId = null;
-                        isStarActive = false;
-                        btn.querySelector('svg').setAttribute('fill', 'none');
-                        btn.classList.remove('active');
-                    } else {
-                        const prevStar = galleryList.querySelector('.gallery-star-btn.active');
-                        if (prevStar) {
-                            prevStar.querySelector('svg').setAttribute('fill', 'none');
-                            prevStar.classList.remove('active');
-                        }
-                        
-                        activeNoteId = itemId;
-                        isStarActive = true;
-                        btn.querySelector('svg').setAttribute('fill', 'currentColor');
-                        btn.classList.add('active');
+    // Star button functionality (notes, prompts, AND chats)
+    if (currentCategory === 'notes' || currentCategory === 'prompts' || currentCategory === 'chats') {
+    galleryList.querySelectorAll('.gallery-star-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const itemId = btn.dataset.id;
+            
+            if (currentCategory === 'notes') {
+                // Notes star logic (existing)
+                if (activeNoteId === itemId) {
+                    activeNoteId = null;
+                    isStarActive = false;
+                    btn.querySelector('svg').setAttribute('fill', 'none');
+                    btn.classList.remove('active');
+                } else {
+                    const prevStar = galleryList.querySelector('.gallery-star-btn.active');
+                    if (prevStar) {
+                        prevStar.querySelector('svg').setAttribute('fill', 'none');
+                        prevStar.classList.remove('active');
                     }
-                } else if (currentCategory === 'prompts') {
-                    // ✅ NEW: Prompts star logic
-                    if (activePromptId === itemId) {
-                        activePromptId = null;
-                        isPromptStarActive = false;
-                        btn.querySelector('svg').setAttribute('fill', 'none');
-                        btn.classList.remove('active');
-                    } else {
-                        const prevStar = galleryList.querySelector('.gallery-star-btn.active');
-                        if (prevStar) {
-                            prevStar.querySelector('svg').setAttribute('fill', 'none');
-                            prevStar.classList.remove('active');
-                        }
-                        
-                        activePromptId = itemId;
-                        isPromptStarActive = true;
-                        btn.querySelector('svg').setAttribute('fill', 'currentColor');
-                        btn.classList.add('active');
-                    }
+                    
+                    activeNoteId = itemId;
+                    isStarActive = true;
+                    btn.querySelector('svg').setAttribute('fill', 'currentColor');
+                    btn.classList.add('active');
                 }
-            });
+            } else if (currentCategory === 'prompts') {
+                // Prompts star logic (existing)
+                if (activePromptId === itemId) {
+                    activePromptId = null;
+                    isPromptStarActive = false;
+                    btn.querySelector('svg').setAttribute('fill', 'none');
+                    btn.classList.remove('active');
+                } else {
+                    const prevStar = galleryList.querySelector('.gallery-star-btn.active');
+                    if (prevStar) {
+                        prevStar.querySelector('svg').setAttribute('fill', 'none');
+                        prevStar.classList.remove('active');
+                    }
+                    
+                    activePromptId = itemId;
+                    isPromptStarActive = true;
+                    btn.querySelector('svg').setAttribute('fill', 'currentColor');
+                    btn.classList.add('active');
+                }
+            } else if (currentCategory === 'chats') {
+                // ✅ NEW: Chats star logic
+                if (activeChatId === itemId) {
+                    activeChatId = null;
+                    isChatStarActive = false;
+                    btn.querySelector('svg').setAttribute('fill', 'none');
+                    btn.classList.remove('active');
+                } else {
+                    const prevStar = galleryList.querySelector('.gallery-star-btn.active');
+                    if (prevStar) {
+                        prevStar.querySelector('svg').setAttribute('fill', 'none');
+                        prevStar.classList.remove('active');
+                    }
+                    
+                    activeChatId = itemId;
+                    isChatStarActive = true;
+                    btn.querySelector('svg').setAttribute('fill', 'currentColor');
+                    btn.classList.add('active');
+                }
+            }
         });
-    }
+    });
+}
 
     // Delete button functionality
     galleryList.querySelectorAll('.gallery-delete-btn').forEach(btn => {
