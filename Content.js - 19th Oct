@@ -5203,16 +5203,65 @@ if (!isBuiltIn) {
         
         workflowContainer.appendChild(cloneBtn);
     }
+
+    // Add New Step button for user-created workflows
     
-    // Add the new container to outputText
-    outputText.appendChild(workflowContainer);
-    
-    // Attach event listeners
+    // Add the workflow container to outputText
+// Add "Add Step" button INSIDE the workflow container for user-created workflows
     if (!isBuiltIn) {
-        attachStepEditListeners(workflow);
-    } else {
-        attachCloneButtonListener(workflow);
-    }
+    const addStepBtn = document.createElement('button');
+    addStepBtn.id = 'add-step-btn';
+    addStepBtn.dataset.workflowId = workflow.id;
+    addStepBtn.style.cssText = `
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.8);
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px !important;
+        font-weight: 500;
+        margin-top: 6px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        align-self: flex-start;
+        width: auto;
+        flex-shrink: 0;
+        line-height: 1 !important;
+        height: 22px;
+    `;
+    addStepBtn.innerHTML = `
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink: 0; display: block;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span style="display: block; line-height: 1 !important;">Add Step</span>
+    `;
+    
+    addStepBtn.addEventListener('mouseenter', () => {
+        addStepBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+        addStepBtn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+    });
+    addStepBtn.addEventListener('mouseleave', () => {
+        addStepBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        addStepBtn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+    });
+    
+    workflowContainer.appendChild(addStepBtn);
+}
+
+// Add the workflow container to outputText
+outputText.appendChild(workflowContainer);
+
+// Attach event listeners
+if (!isBuiltIn) {
+    attachStepEditListeners(workflow);
+    attachAddStepButtonListener(workflow);
+} else {
+    attachCloneButtonListener(workflow);
+}
 }
 
 function attachStepEditListeners(workflow) {
@@ -5479,6 +5528,74 @@ function attachCloneButtonListener(workflow) {
             cloneBtn.innerHTML = originalHTML;
             cloneBtn.disabled = false;
             showNotification('Failed to create copy', 'error');
+        }
+    });
+}
+
+function attachAddStepButtonListener(workflow) {
+    const addStepBtn = shadowRoot.getElementById('add-step-btn');
+    if (!addStepBtn) return;
+    
+    addStepBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        
+        // Show loading state
+        const originalHTML = addStepBtn.innerHTML;
+        addStepBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+            </svg>
+            Adding step...
+        `;
+        addStepBtn.disabled = true;
+        
+        try {
+            // Load workflow from storage
+            const data = await chrome.storage.local.get('workflows');
+            const workflows = data.workflows || [];
+            const workflowIndex = workflows.findIndex(w => w.id === workflow.id);
+            
+            if (workflowIndex !== -1) {
+                // Create new step
+                const newStepNumber = workflows[workflowIndex].steps.length + 1;
+                const newStep = {
+                    number: newStepNumber,
+                    prompt: `Step ${newStepNumber} prompt`
+                };
+                
+                // Add to workflow
+                workflows[workflowIndex].steps.push(newStep);
+                workflows[workflowIndex].timestamp = new Date().toISOString();
+                
+                // Save to storage
+                await chrome.storage.local.set({ workflows });
+                
+                console.log('✅ New step added successfully');
+                
+                // Show success message
+                addStepBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Step added!
+                `;
+                addStepBtn.style.background = 'rgba(0, 255, 0, 0.2)';
+                addStepBtn.style.borderColor = 'rgba(0, 255, 0, 0.4)';
+                
+                // Reload workflow display after a moment
+                setTimeout(() => {
+                    displayWorkflowSteps(workflows[workflowIndex]);
+                }, 800);
+                
+            } else {
+                throw new Error('Workflow not found');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error adding step:', error);
+            addStepBtn.innerHTML = originalHTML;
+            addStepBtn.disabled = false;
+            showNotification('Failed to add step', 'error');
         }
     });
 }
