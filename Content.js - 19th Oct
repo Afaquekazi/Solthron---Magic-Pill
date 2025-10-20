@@ -3662,6 +3662,7 @@ function createUI() {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
+            gap: 8px;
         }
 
         .back-to-categories {
@@ -4346,6 +4347,7 @@ function createUI() {
     
     // Initialize UI handlers and gallery
     initializeUIHandlers();
+    initializeAddWorkflowFeature();
     initializeGallery();
     initializeAddPromptFeature(); // ✅ ADD THIS LINE
 
@@ -4403,9 +4405,11 @@ function initializeGallery() {
         );
         renderGalleryList(items, '');
         
-        // ✅ ADD THIS: Initialize add prompt feature when prompts category is selected
+        // ✅ ADD THIS: Initialize add button for prompts and workflows
         if (currentCategory === 'prompts') {
             updateGalleryHeaderWithAddButton();
+        } else if (currentCategory === 'workflows') {
+            updateGalleryHeaderWithAddWorkflowButton();
         }
     });
 });
@@ -4415,16 +4419,24 @@ function initializeGallery() {
     galleryContent.style.display = 'none';
     currentCategory = null;
     
-    // ✅ ADD THIS: Remove add prompt button when going back
+    // ✅ ADD THIS: Remove add buttons when going back
     const addPromptBtn = shadowRoot.getElementById('add-prompt-btn');
+    const addWorkflowBtn = shadowRoot.getElementById('add-workflow-btn');
     if (addPromptBtn) {
         addPromptBtn.remove();
     }
+    if (addWorkflowBtn) {
+        addWorkflowBtn.remove();
+    }
     
-    // ✅ ADD THIS: Hide add form if visible
+    // Hide add form if visible
     const addPromptForm = shadowRoot.getElementById('add-prompt-form');
+    const addWorkflowForm = shadowRoot.getElementById('add-workflow-form');
     if (addPromptForm) {
         addPromptForm.style.display = 'none';
+    }
+    if (addWorkflowForm) {
+        addWorkflowForm.style.display = 'none';
     }
     
     const galleryList = shadowRoot.getElementById('gallery-list');
@@ -4721,6 +4733,285 @@ saveBtn.addEventListener('click', async () => {
 });
 }
 
+// ========== ADD WORKFLOW FEATURE ==========
+function initializeAddWorkflowFeature() {
+    const galleryHeader = shadowRoot.querySelector('.gallery-header');
+    
+    // Create add workflow form (hidden by default)
+    const addWorkflowForm = document.createElement('div');
+    addWorkflowForm.id = 'add-workflow-form';
+    addWorkflowForm.style.cssText = `
+        display: none;
+        padding: 12px;
+        background: #2a2a2a;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    `;
+    
+    addWorkflowForm.innerHTML = `
+        <div style="margin-bottom: 10px;">
+            <label style="
+                display: block;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 11px;
+                margin-bottom: 4px;
+            ">Workflow Title</label>
+            <input 
+                type="text" 
+                id="workflow-title-input"
+                placeholder="e.g., Email Response Workflow"
+                style="
+                    width: 100%;
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 4px;
+                    padding: 6px 8px;
+                    color: white;
+                    font-size: 12px;
+                    outline: none;
+                "
+            />
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+            <label style="
+                display: block;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 11px;
+                margin-bottom: 4px;
+            ">Step 1</label>
+            <textarea 
+                id="workflow-step1-input"
+                placeholder="Enter the first step of your workflow..."
+                style="
+                    width: 100%;
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 4px;
+                    padding: 6px 8px;
+                    color: white;
+                    font-size: 12px;
+                    outline: none;
+                    height: 80px;
+                    resize: none;
+                    font-family: inherit;
+                    line-height: 1.4;
+                    overflow-y: auto;
+                "
+            ></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button id="cancel-add-workflow" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.8);
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            ">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Cancel
+            </button>
+            
+            <button id="create-workflow-btn" style="
+                background: rgba(0, 255, 0, 0.2);
+                border: 1px solid rgba(0, 255, 0, 0.4);
+                color: #00ff00;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 600;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            ">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Create
+            </button>
+        </div>
+    `;
+    
+    // Insert form after gallery header
+    const galleryContent = shadowRoot.getElementById('gallery-content');
+    const galleryList = shadowRoot.getElementById('gallery-list');
+    galleryList.parentNode.insertBefore(addWorkflowForm, galleryList);
+    
+    // Add hover effects for buttons
+    const cancelBtn = addWorkflowForm.querySelector('#cancel-add-workflow');
+    const createBtn = addWorkflowForm.querySelector('#create-workflow-btn');
+    
+    cancelBtn.addEventListener('mouseenter', () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.15)';
+    });
+    cancelBtn.addEventListener('mouseleave', () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+    });
+    
+    createBtn.addEventListener('mouseenter', () => {
+        createBtn.style.background = 'rgba(0, 255, 0, 0.3)';
+    });
+    createBtn.addEventListener('mouseleave', () => {
+        createBtn.style.background = 'rgba(0, 255, 0, 0.2)';
+    });
+    
+    // Add focus styles for inputs
+    const titleInput = addWorkflowForm.querySelector('#workflow-title-input');
+    const step1Input = addWorkflowForm.querySelector('#workflow-step1-input');
+    
+    [titleInput, step1Input].forEach(input => {
+        input.addEventListener('focus', () => {
+            input.style.borderColor = 'rgba(255, 255, 0, 0.5)';
+            input.style.boxShadow = '0 0 0 2px rgba(255, 255, 0, 0.2)';
+        });
+        input.addEventListener('blur', () => {
+            input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            input.style.boxShadow = 'none';
+        });
+    });
+    
+    // Cancel button handler
+    cancelBtn.addEventListener('click', () => {
+        const galleryHeader = shadowRoot.querySelector('.gallery-header');
+        
+        // Restore gallery header
+        galleryHeader.style.display = 'block';
+        
+        // Reset form
+        titleInput.value = '';
+        step1Input.value = '';
+        addWorkflowForm.style.display = 'none';
+        galleryList.style.display = 'block';
+    });
+    
+    // Create button handler
+    createBtn.addEventListener('click', async () => {
+        const title = titleInput.value.trim();
+        const step1 = step1Input.value.trim();
+        
+        // Validation
+        if (!title) {
+            titleInput.style.borderColor = '#ff6b6b';
+            titleInput.focus();
+            setTimeout(() => {
+                titleInput.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            }, 2000);
+            return;
+        }
+        
+        if (!step1) {
+            step1Input.style.borderColor = '#ff6b6b';
+            step1Input.focus();
+            setTimeout(() => {
+                step1Input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            }, 2000);
+            return;
+        }
+        
+        // Show loading state
+        createBtn.disabled = true;
+        createBtn.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+            </svg>
+            Creating...
+        `;
+        
+        // Create new workflow
+        const newWorkflow = {
+            id: `workflow-${Date.now()}`,
+            name: title.replace(/\s+/g, ''),
+            title: title,
+            steps: [
+                { number: 1, prompt: step1 }
+            ],
+            timestamp: new Date().toISOString(),
+            source: 'user_created'
+        };
+        
+        try {
+            // Save to storage
+            const data = await chrome.storage.local.get('workflows');
+            const workflows = data.workflows || [];
+            workflows.push(newWorkflow);
+            await chrome.storage.local.set({ workflows });
+            
+            console.log('✅ New workflow created:', title);
+            
+            // Show success feedback
+            createBtn.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Created!
+            `;
+            
+            // Reset form and refresh list
+            setTimeout(async () => {
+                // Get references
+                const galleryHeader = shadowRoot.querySelector('.gallery-header');
+                const galleryList = shadowRoot.getElementById('gallery-list');
+                const addWorkflowForm = shadowRoot.getElementById('add-workflow-form');
+                
+                // Restore gallery header
+                if (galleryHeader) {
+                    galleryHeader.style.display = 'block';
+                }
+                
+                // Reset inputs
+                titleInput.value = '';
+                step1Input.value = '';
+                
+                // Hide form, show list
+                addWorkflowForm.style.display = 'none';
+                galleryList.style.display = 'block';
+                
+                // Refresh the workflow list
+                const workflows = await loadWorkflows();
+                renderGalleryList(workflows, shadowRoot.getElementById('gallery-search').value);
+                
+                // Reset button
+                createBtn.disabled = false;
+                createBtn.innerHTML = `
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Create
+                `;
+                
+                // Show notification
+                showNotification('✅ Workflow created: ' + title);
+            }, 800);
+            
+        } catch (error) {
+            console.error('❌ Error creating workflow:', error);
+            showNotification('❌ Failed to create workflow', 'error');
+            
+            // Reset button
+            createBtn.disabled = false;
+            createBtn.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Create
+            `;
+        }
+    });
+}
+
+
 function updateGalleryHeaderWithAddButton() {
     // This function will be called when prompts category is selected
     const galleryTitle = shadowRoot.getElementById('gallery-title');
@@ -4740,7 +5031,8 @@ function updateGalleryHeaderWithAddButton() {
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-left: 8px;
+            margin-left: auto;
+            margin-right: 16px;
         `;
         
         addButton.innerHTML = `
@@ -4762,28 +5054,122 @@ function updateGalleryHeaderWithAddButton() {
         });
         
         addButton.addEventListener('click', () => {
-    const addPromptForm = shadowRoot.getElementById('add-prompt-form');
-    const galleryList = shadowRoot.getElementById('gallery-list');
-    const galleryHeader = shadowRoot.querySelector('.gallery-header');
-    
-    if (addPromptForm) {
-        // Hide the gallery header completely
-        galleryHeader.style.display = 'none';
+            const addPromptForm = shadowRoot.getElementById('add-prompt-form');
+            const galleryList = shadowRoot.getElementById('gallery-list');
+            const galleryHeader = shadowRoot.querySelector('.gallery-header');
+            
+            if (addPromptForm) {
+                // Hide the gallery header completely
+                galleryHeader.style.display = 'none';
+                
+                // Show the form and hide list
+                addPromptForm.style.display = 'block';
+                galleryList.style.display = 'none';
+                
+                // Focus on title input
+                setTimeout(() => {
+                    shadowRoot.getElementById('prompt-title-input').focus();
+                }, 100);
+            }
+        });
         
-        // Show the form and hide list
-        addPromptForm.style.display = 'block';
-        galleryList.style.display = 'none';
+        // Create a wrapper for right-side buttons (+ icon and back button)
+        const rightButtonsWrapper = document.createElement('div');
+        rightButtonsWrapper.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        `;
         
-        // Focus on title input
-        setTimeout(() => {
-            shadowRoot.getElementById('prompt-title-input').focus();
-        }, 100);
-    }
-});
-        
-        // Insert button between title and back button
+        // Get the back button
         const backButton = titleRow.querySelector('.back-to-categories');
-        titleRow.insertBefore(addButton, backButton);
+        
+        // Insert + button before back button in the wrapper
+        rightButtonsWrapper.appendChild(addButton);
+        rightButtonsWrapper.appendChild(backButton);
+        
+        // Replace the back button with the wrapper
+        titleRow.appendChild(rightButtonsWrapper);
+    }
+}
+
+function updateGalleryHeaderWithAddWorkflowButton() {
+    const galleryTitle = shadowRoot.getElementById('gallery-title');
+    const titleRow = galleryTitle.parentElement;
+    
+    // Check if we're in workflows view and add button doesn't exist
+    if (currentCategory === 'workflows' && !shadowRoot.getElementById('add-workflow-btn')) {
+        const addButton = document.createElement('button');
+        addButton.id = 'add-workflow-btn';
+        addButton.style.cssText = `
+            background: none;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            color: rgba(255, 215, 0, 0.8);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            margin-right: 16px;
+        `;
+        
+        addButton.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="16"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+        `;
+        
+        addButton.addEventListener('mouseenter', () => {
+            addButton.style.color = 'rgba(255, 215, 0, 1)';
+            addButton.style.transform = 'scale(1.1)';
+        });
+        
+        addButton.addEventListener('mouseleave', () => {
+            addButton.style.color = 'rgba(255, 215, 0, 0.8)';
+            addButton.style.transform = 'scale(1)';
+        });
+        
+        addButton.addEventListener('click', () => {
+            const addWorkflowForm = shadowRoot.getElementById('add-workflow-form');
+            const galleryList = shadowRoot.getElementById('gallery-list');
+            const galleryHeader = shadowRoot.querySelector('.gallery-header');
+            
+            if (addWorkflowForm) {
+                // Hide the gallery header completely
+                galleryHeader.style.display = 'none';
+                
+                // Show the form and hide list
+                addWorkflowForm.style.display = 'block';
+                galleryList.style.display = 'none';
+                
+                // Focus on title input
+                setTimeout(() => {
+                    shadowRoot.getElementById('workflow-title-input').focus();
+                }, 100);
+            }
+        });
+        
+        // Create a wrapper for right-side buttons (+ icon and back button)
+        const rightButtonsWrapper = document.createElement('div');
+        rightButtonsWrapper.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        `;
+        
+        // Get the back button
+        const backButton = titleRow.querySelector('.back-to-categories');
+        
+        // Insert + button before back button in the wrapper
+        rightButtonsWrapper.appendChild(addButton);
+        rightButtonsWrapper.appendChild(backButton);
+        
+        // Replace the back button with the wrapper
+        titleRow.appendChild(rightButtonsWrapper);
     }
 }
 
