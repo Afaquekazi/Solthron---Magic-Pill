@@ -5086,15 +5086,17 @@ content.textContent = step.prompt;
         
         // Edit button for user-created workflows
         // Edit button for user-created workflows
-if (!isBuiltIn) {
-    // Make step bubble position relative for absolute positioning of edit button
+         // Edit and Delete buttons for user-created workflows
+     if (!isBuiltIn) {
+    // Make step bubble position relative for absolute positioning of buttons
     stepBubble.style.position = 'relative';
-    stepBubble.style.paddingRight = '35px'; // Add space for edit button
+    stepBubble.style.paddingRight = '70px'; // Increased space for both buttons
     
-    const editBtn = document.createElement('button');
-    editBtn.className = 'edit-step-btn';
-    editBtn.dataset.stepNumber = step.number;
-    editBtn.style.cssText = `
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-step-btn';
+    deleteBtn.dataset.stepNumber = step.number;
+    deleteBtn.style.cssText = `
     position: absolute;
     top: 50%;
     right: 10px;
@@ -5105,30 +5107,71 @@ if (!isBuiltIn) {
     cursor: pointer;
     color: rgba(255, 255, 255, 0.3);
     transition: all 0.2s ease;
+    z-index: 2;
 `;
-            editBtn.innerHTML = `
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>
-            `;
-            
-            editBtn.addEventListener('mouseenter', () => {
-            editBtn.style.color = 'rgba(255, 215, 0, 0.95)';
-            editBtn.style.transform = 'translateY(-50%) scale(1.1)';
-        });
-            editBtn.addEventListener('mouseleave', () => {
-            editBtn.style.color = 'rgba(255, 255, 255, 0.3)';
-            editBtn.style.transform = 'translateY(-50%) scale(1)';
-        });
-            
-            // Stop propagation on edit button
-            editBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-            
-            stepBubble.appendChild(editBtn);
-        }
+    deleteBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+    `;
+    
+    deleteBtn.addEventListener('mouseenter', () => {
+        deleteBtn.style.color = 'rgba(255, 107, 107, 0.95)';
+        deleteBtn.style.transform = 'translateY(-50%) scale(1.1)';
+    });
+    deleteBtn.addEventListener('mouseleave', () => {
+        deleteBtn.style.color = 'rgba(255, 255, 255, 0.3)';
+        deleteBtn.style.transform = 'translateY(-50%) scale(1)';
+    });
+    
+    // Stop propagation on delete button
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    
+    // Edit button (existing code - just update position)
+    const editBtn = document.createElement('button');
+    editBtn.className = 'edit-step-btn';
+    editBtn.dataset.stepNumber = step.number;
+    editBtn.style.cssText = `
+    position: absolute;
+    top: 50%;
+    right: 40px;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.3);
+    transition: all 0.2s ease;
+    z-index: 2;
+`;
+    editBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+    `;
+    
+    editBtn.addEventListener('mouseenter', () => {
+        editBtn.style.color = 'rgba(255, 215, 0, 0.95)';
+        editBtn.style.transform = 'translateY(-50%) scale(1.1)';
+    });
+    editBtn.addEventListener('mouseleave', () => {
+        editBtn.style.color = 'rgba(255, 255, 255, 0.3)';
+        editBtn.style.transform = 'translateY(-50%) scale(1)';
+    });
+    
+    // Stop propagation on edit button
+    editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    
+    stepBubble.appendChild(deleteBtn);
+    stepBubble.appendChild(editBtn);
+}
         
         // ✅ NEW: Click handler to view full content (like prompts)
         stepBubble.addEventListener('click', (e) => {
@@ -5258,6 +5301,7 @@ outputText.appendChild(workflowContainer);
 // Attach event listeners
 if (!isBuiltIn) {
     attachStepEditListeners(workflow);
+    attachStepDeleteListeners(workflow);
     attachAddStepButtonListener(workflow);
 } else {
     attachCloneButtonListener(workflow);
@@ -5389,20 +5433,35 @@ function attachStepEditListeners(workflow) {
                             await chrome.storage.local.set({ workflows });
                             
                             // Update display and data attribute
-bubble.dataset.stepPrompt = newPrompt;
-contentDiv.style.cssText = `
-    flex: 1;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
-    line-height: 1.5;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-`;
-contentDiv.textContent = newPrompt;
-btn.style.display = 'block';
+                            // Update display and data attribute
+                            bubble.dataset.stepPrompt = newPrompt;
+
+                            // Clear content first
+                            contentDiv.innerHTML = '';
+                            contentDiv.textContent = '';
+
+                            // Reset all inline styles
+                            contentDiv.style.cssText = '';
+
+                           // Apply truncation styles
+                           contentDiv.className = 'step-content';
+                           contentDiv.style.cssText = `
+                           flex: 1;
+                           color: rgba(255, 255, 255, 0.9);
+                           font-size: 12px;
+                           line-height: 1.5;
+                           overflow: hidden;
+                           text-overflow: ellipsis;
+                           display: -webkit-box;
+                           -webkit-line-clamp: 2;
+                           -webkit-box-orient: vertical;
+                        `;
+
+                            // Set the new text
+                            contentDiv.textContent = newPrompt;
+
+                            // Show edit button again
+                            btn.style.display = 'block';
                             
                             // Show success feedback
                             bubble.style.background = 'rgba(0, 255, 0, 0.1)';
@@ -5457,6 +5516,68 @@ btn.style.display = 'block';
                     cancelEdit();
                 }
             });
+        });
+    });
+}
+
+function attachStepDeleteListeners(workflow) {
+    shadowRoot.querySelectorAll('.delete-step-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            const stepNumber = parseInt(btn.dataset.stepNumber);
+            
+            // Confirm deletion
+            const bubble = btn.closest('.workflow-step-bubble');
+            const stepContent = bubble.dataset.stepPrompt;
+            
+            // Visual confirmation (optional - you can add a confirm dialog instead)
+            bubble.style.background = 'rgba(255, 107, 107, 0.2)';
+            bubble.style.borderColor = 'rgba(255, 107, 107, 0.4)';
+            
+            // Short delay for visual feedback
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            try {
+                // Load workflow from storage
+                const data = await chrome.storage.local.get('workflows');
+                const workflows = data.workflows || [];
+                const workflowIndex = workflows.findIndex(w => w.id === workflow.id);
+                
+                if (workflowIndex !== -1) {
+                    // Remove the step
+                    const stepIndex = workflows[workflowIndex].steps.findIndex(s => s.number === stepNumber);
+                    
+                    if (stepIndex !== -1) {
+                        workflows[workflowIndex].steps.splice(stepIndex, 1);
+                        
+                        // Re-number remaining steps
+                        workflows[workflowIndex].steps.forEach((step, idx) => {
+                            step.number = idx + 1;
+                        });
+                        
+                        workflows[workflowIndex].timestamp = new Date().toISOString();
+                        
+                        // Save to storage
+                        await chrome.storage.local.set({ workflows });
+                        
+                        console.log('✅ Step deleted successfully');
+                        
+                        // Reload workflow display
+                        displayWorkflowSteps(workflows[workflowIndex]);
+                        
+                        // Show success notification
+                        showNotification('Step deleted', 'success');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error deleting step:', error);
+                showNotification('Failed to delete step', 'error');
+                
+                // Reset visual state on error
+                bubble.style.background = 'rgba(255, 255, 255, 0.03)';
+                bubble.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+            }
         });
     });
 }
