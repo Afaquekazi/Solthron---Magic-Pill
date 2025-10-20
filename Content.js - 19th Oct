@@ -4347,6 +4347,7 @@ function createUI() {
     // Initialize UI handlers and gallery
     initializeUIHandlers();
     initializeGallery();
+    initializeAddPromptFeature(); // ✅ ADD THIS LINE
 
     // Hide button initially
     button.style.display = 'none';
@@ -4401,15 +4402,36 @@ function initializeGallery() {
             loadPersonaTemplates()
         );
         renderGalleryList(items, '');
+        
+        // ✅ ADD THIS: Initialize add prompt feature when prompts category is selected
+        if (currentCategory === 'prompts') {
+            updateGalleryHeaderWithAddButton();
+        }
     });
 });
  
     shadowRoot.querySelector('.back-to-categories').addEventListener('click', () => {
-        categorySelection.style.display = 'block';
-        galleryContent.style.display = 'none';
-        currentCategory = null;
-        // Keep gallery view open, just go back to categories
-    });
+    categorySelection.style.display = 'block';
+    galleryContent.style.display = 'none';
+    currentCategory = null;
+    
+    // ✅ ADD THIS: Remove add prompt button when going back
+    const addPromptBtn = shadowRoot.getElementById('add-prompt-btn');
+    if (addPromptBtn) {
+        addPromptBtn.remove();
+    }
+    
+    // ✅ ADD THIS: Hide add form if visible
+    const addPromptForm = shadowRoot.getElementById('add-prompt-form');
+    if (addPromptForm) {
+        addPromptForm.style.display = 'none';
+    }
+    
+    const galleryList = shadowRoot.getElementById('gallery-list');
+    if (galleryList) {
+        galleryList.style.display = 'block';
+    }
+});
  
     searchInput.addEventListener('input', async (e) => {
         if (!currentCategory) return;
@@ -4420,6 +4442,349 @@ function initializeGallery() {
         );
         renderGalleryList(items, e.target.value);
     });
+}
+
+// ========== ADD PROMPT FEATURE ==========
+function initializeAddPromptFeature() {
+    const galleryHeader = shadowRoot.querySelector('.gallery-header');
+    
+    // Create add prompt form (hidden by default)
+    const addPromptForm = document.createElement('div');
+    addPromptForm.id = 'add-prompt-form';
+    addPromptForm.style.cssText = `
+        display: none;
+        padding: 12px;
+        background: #2a2a2a;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    `;
+    
+    addPromptForm.innerHTML = `
+        <div style="margin-bottom: 10px;">
+            <label style="
+                display: block;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 11px;
+                margin-bottom: 4px;
+            ">Title</label>
+            <input 
+                type="text" 
+                id="prompt-title-input"
+                placeholder="Enter prompt title..."
+                style="
+                    width: 100%;
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 4px;
+                    padding: 6px 8px;
+                    color: white;
+                    font-size: 12px;
+                    outline: none;
+                "
+            />
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+            <label style="
+                display: block;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 11px;
+                margin-bottom: 4px;
+            ">Prompt</label>
+            <textarea 
+    id="prompt-text-input"
+    placeholder="Enter your prompt text..."
+    style="
+        width: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        padding: 6px 8px;
+        color: white;
+        font-size: 12px;
+        outline: none;
+        height: 120px;
+        resize: none;
+        font-family: inherit;
+        line-height: 1.4;
+        overflow-y: auto;
+    "
+></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button id="cancel-add-prompt" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.8);
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            ">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Cancel
+            </button>
+            
+            <button id="save-new-prompt" style="
+                background: rgba(0, 255, 0, 0.2);
+                border: 1px solid rgba(0, 255, 0, 0.4);
+                color: #00ff00;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 600;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            ">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Save
+            </button>
+        </div>
+    `;
+    
+    // Insert form after gallery header
+    const galleryContent = shadowRoot.getElementById('gallery-content');
+    const galleryList = shadowRoot.getElementById('gallery-list');
+    galleryList.parentNode.insertBefore(addPromptForm, galleryList);
+    
+    // Add hover effects for buttons
+    const cancelBtn = addPromptForm.querySelector('#cancel-add-prompt');
+    const saveBtn = addPromptForm.querySelector('#save-new-prompt');
+    
+    cancelBtn.addEventListener('mouseenter', () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.15)';
+    });
+    cancelBtn.addEventListener('mouseleave', () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+    });
+    
+    saveBtn.addEventListener('mouseenter', () => {
+        saveBtn.style.background = 'rgba(0, 255, 0, 0.3)';
+    });
+    saveBtn.addEventListener('mouseleave', () => {
+        saveBtn.style.background = 'rgba(0, 255, 0, 0.2)';
+    });
+    
+    // Add focus styles for inputs
+    const titleInput = addPromptForm.querySelector('#prompt-title-input');
+    const textInput = addPromptForm.querySelector('#prompt-text-input');
+    
+    [titleInput, textInput].forEach(input => {
+        input.addEventListener('focus', () => {
+            input.style.borderColor = 'rgba(255, 255, 0, 0.5)';
+            input.style.boxShadow = '0 0 0 2px rgba(255, 255, 0, 0.2)';
+        });
+        input.addEventListener('blur', () => {
+            input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            input.style.boxShadow = 'none';
+        });
+    });
+    
+    
+    // Cancel button handler
+    // Cancel button handler
+cancelBtn.addEventListener('click', () => {
+    const galleryHeader = shadowRoot.querySelector('.gallery-header');
+    
+    // Restore gallery header
+    galleryHeader.style.display = 'block';
+    
+    // Reset form
+    titleInput.value = '';
+    textInput.value = '';
+    addPromptForm.style.display = 'none';
+    galleryList.style.display = 'block';
+});
+    
+    // Save button handler
+    // Save button handler
+saveBtn.addEventListener('click', async () => {
+    const title = titleInput.value.trim();
+    const text = textInput.value.trim();
+    
+    // Validation
+    if (!title) {
+        titleInput.style.borderColor = '#ff6b6b';
+        titleInput.focus();
+        setTimeout(() => {
+            titleInput.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        }, 2000);
+        return;
+    }
+    
+    if (!text) {
+        textInput.style.borderColor = '#ff6b6b';
+        textInput.focus();
+        setTimeout(() => {
+            textInput.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        }, 2000);
+        return;
+    }
+    
+    // Show loading state
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+            <path d="M21 12a9 9 0 11-6.219-8.56"></path>
+        </svg>
+        Saving...
+    `;
+    
+    // Create new prompt
+    const newPrompt = {
+        id: Date.now().toString(),
+        title: title,
+        text: text,
+        timestamp: new Date().toISOString()
+    };
+    
+    try {
+        // Save to storage
+        const data = await chrome.storage.sync.get('savedPrompts');
+        const savedPrompts = data.savedPrompts || [];
+        savedPrompts.push(newPrompt);
+        await chrome.storage.sync.set({ savedPrompts });
+        
+        console.log('✅ New prompt saved:', title);
+        
+        // Show success feedback
+        saveBtn.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Saved!
+        `;
+        
+        // Reset form and refresh list
+        setTimeout(async () => {
+            // Get references
+            const galleryHeader = shadowRoot.querySelector('.gallery-header');
+            const galleryList = shadowRoot.getElementById('gallery-list');
+            const addPromptForm = shadowRoot.getElementById('add-prompt-form');
+            
+            // Restore gallery header
+            if (galleryHeader) {
+                galleryHeader.style.display = 'block';
+            }
+            
+            // Reset inputs
+            titleInput.value = '';
+            textInput.value = '';
+            
+            // Hide form, show list
+            addPromptForm.style.display = 'none';
+            galleryList.style.display = 'block';
+            
+            // Refresh the prompt list
+            const prompts = await loadPrompts();
+            renderGalleryList(prompts, shadowRoot.getElementById('gallery-search').value);
+            
+            // Reset button
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Save
+            `;
+            
+            // Show notification
+            showNotification('✅ Prompt saved: ' + title);
+        }, 800);
+        
+    } catch (error) {
+        console.error('❌ Error saving prompt:', error);
+        showNotification('❌ Failed to save prompt', 'error');
+        
+        // Reset button
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Save
+        `;
+    }
+});
+}
+
+function updateGalleryHeaderWithAddButton() {
+    // This function will be called when prompts category is selected
+    const galleryTitle = shadowRoot.getElementById('gallery-title');
+    const titleRow = galleryTitle.parentElement;
+    
+    // Check if we're in prompts view and add button doesn't exist
+    if (currentCategory === 'prompts' && !shadowRoot.getElementById('add-prompt-btn')) {
+        const addButton = document.createElement('button');
+        addButton.id = 'add-prompt-btn';
+        addButton.style.cssText = `
+            background: none;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            color: rgba(255, 215, 0, 0.8);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+        `;
+        
+        addButton.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="16"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+        `;
+        
+        addButton.addEventListener('mouseenter', () => {
+            addButton.style.color = 'rgba(255, 215, 0, 1)';
+            addButton.style.transform = 'scale(1.1)';
+        });
+        
+        addButton.addEventListener('mouseleave', () => {
+            addButton.style.color = 'rgba(255, 215, 0, 0.8)';
+            addButton.style.transform = 'scale(1)';
+        });
+        
+        addButton.addEventListener('click', () => {
+    const addPromptForm = shadowRoot.getElementById('add-prompt-form');
+    const galleryList = shadowRoot.getElementById('gallery-list');
+    const galleryHeader = shadowRoot.querySelector('.gallery-header');
+    
+    if (addPromptForm) {
+        // Hide the gallery header completely
+        galleryHeader.style.display = 'none';
+        
+        // Show the form and hide list
+        addPromptForm.style.display = 'block';
+        galleryList.style.display = 'none';
+        
+        // Focus on title input
+        setTimeout(() => {
+            shadowRoot.getElementById('prompt-title-input').focus();
+        }, 100);
+    }
+});
+        
+        // Insert button between title and back button
+        const backButton = titleRow.querySelector('.back-to-categories');
+        titleRow.insertBefore(addButton, backButton);
+    }
 }
 
 function renderGalleryList(items, searchTerm = '') {
