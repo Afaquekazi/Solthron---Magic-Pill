@@ -9,6 +9,7 @@ import hashlib
 import base64
 import json
 import datetime
+import sqlite3  # ADD THIS LINE
 
 
 # NEW FIREBASE IMPORTS
@@ -56,6 +57,33 @@ except Exception as e:
     print(f"❌ Firebase initialization failed: {e}")
     FIREBASE_ENABLED = False
 
+    # ========================================
+# ANALYTICS DATABASE SETUP
+# ========================================
+def init_analytics_db():
+    """Initialize analytics database for demo tracking"""
+    conn = sqlite3.connect('demo_analytics.db')
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS demo_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            session_id TEXT,
+            user_agent TEXT,
+            metadata TEXT
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+    print("✅ Demo analytics database initialized!")
+
+# Initialize when server starts
+init_analytics_db()
+
+
 # CREDIT MAPPING FUNCTION (matches your extension logic exactly)
 def get_feature_credits(mode):
     """Map features to credit costs - matches extension logic exactly"""
@@ -97,27 +125,27 @@ def get_feature_credits(mode):
 
     # Determine credit cost based on mode
     if mode in text_processing_modes:
-        return 6
+        return 15
     elif mode in convert_prompt_modes:
-        return 8
+        return 15
     elif mode in persona_modes:
-        return 10
+        return 15
     elif mode in image_modes:
-        return 12
+        return 15
     elif mode in explain_modes:
-        return 5
+        return 15
     elif mode in ai_assistant_modes:
         return 15
     elif mode in magic_pill_modes:
-        return 10
+        return 15
     elif mode in auto_suggestion_modes:
-        return 3
+        return 15
     elif mode in pdf_analysis_modes:  # ADD THIS
-        return 5
+        return 15
     elif mode in free_modes:
         return 0
     else:
-        return 6  # Default fallback
+        return 15  # Default fallback
 
 # AUTHENTICATION HELPER FUNCTIONS
 def verify_auth_token(token):
@@ -147,6 +175,7 @@ def verify_auth_token(token):
     except Exception as e:
         print(f"Token verification failed: {e}")
         return None
+
 
 def check_and_deduct_credits(user_uid, feature_mode):
     """Check if user has enough credits and deduct them"""
@@ -558,6 +587,55 @@ def auth_login():
             'token': token,
             'user': {
                 'uid': user_doc.id,
+                'email': email,
+                'credits': user_data.get('credits', 0)
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/auth/google-login', methods=['POST'])
+def google_login():
+    """Handle Google OAuth login - same as email/password but verifies Firebase token"""
+    try:
+        if not FIREBASE_ENABLED:
+            return jsonify({'error': 'Authentication not available'}), 503
+
+        data = request.get_json()
+        firebase_token = data.get('firebaseToken')
+
+        if not firebase_token:
+            return jsonify({'error': 'Firebase token required'}), 400
+
+        # Verify Firebase token
+        decoded_token = auth.verify_id_token(firebase_token)
+        user_id = decoded_token['uid']
+        email = decoded_token.get('email')
+
+        # Get user from Firestore
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+
+        if not user_doc.exists:
+            return jsonify({'error': 'User not found'}), 401
+
+        user_data = user_doc.to_dict()
+
+        # Create 30-day JWT (SAME as /auth/login does)
+        token_payload = {
+            'uid': user_id,
+            'email': email,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=30)
+        }
+
+        token = jwt.encode(token_payload, 'your-secret-key', algorithm='HS256')
+
+        return jsonify({
+            'success': True,
+            'token': token,
+            'user': {
+                'uid': user_id,
                 'email': email,
                 'credits': user_data.get('credits', 0)
             }
@@ -6450,6 +6528,368 @@ def parse_json_response_enhanced(response_text):
 
     # If all else fails, raise error
     raise json.JSONDecodeError("Could not parse JSON from response", response_text, 0)
+
+
+# ========================================
+# DEMO ANALYTICS ENDPOINTS
+# ========================================
+
+@app.route('/track-demo', methods=['POST'])
+def track_demo():
+    """Track demo interactions (pill clicks, page visits, etc.)"""
+    try:
+        data = request.get_json()
+        event_type = data.get('event')  # 'page_visits', 'pill_clicks', 'get_started_clicks'
+        session_id = data.get('sessionId', 'unknown')
+        user_agent = request.headers.get('User-Agent', 'unknown')
+        metadata = data.get('metadata', {})
+
+        # Save to database
+        conn = sqlite3.connect('demo_analytics.db')
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO demo_events (event_type, session_id, user_agent, metadata)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            event_type,
+            session_id,
+            user_agent,
+            str(metadata)
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({'success': True, 'event': event_type})
+
+    except Exception as e:
+        print(f"❌ Demo tracking error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/analytics/demo-stats', methods=['GET'])
+def get_demo_stats():
+    """Get demo analytics stats with unique users tracking"""
+    try:
+        conn = sqlite3.connect('demo_analytics.db')
+        cursor = conn.cursor()
+
+        # Helper function to get counts with unique users
+        def get_stats(time_filter=''):
+            if time_filter:
+                where_clause = f"WHERE {time_filter}"
+            else:
+                where_clause = ""
+
+            # Total events by type
+            cursor.execute(f'''
+                SELECT event_type, COUNT(*) as count
+                FROM demo_events
+                {where_clause}
+                GROUP BY event_type
+            ''')
+            totals = {row[0]: row[1] for row in cursor.fetchall()}
+
+            # Unique users (distinct session_ids)
+            cursor.execute(f'''
+                SELECT COUNT(DISTINCT session_id) as unique_users
+                FROM demo_events
+                {where_clause}
+            ''')
+            unique_users = cursor.fetchone()[0]
+
+            return totals, unique_users
+
+        # Get stats for different time periods
+        all_time, all_time_users = get_stats()
+        today, today_users = get_stats("DATE(timestamp) = DATE('now')")
+        yesterday, yesterday_users = get_stats("DATE(timestamp) = DATE('now', '-1 day')")
+        this_week, this_week_users = get_stats("DATE(timestamp) >= DATE('now', '-7 days')")
+        month_to_date, mtd_users = get_stats("strftime('%Y-%m', timestamp) = strftime('%Y-%m', 'now')")
+        year_to_date, ytd_users = get_stats("strftime('%Y', timestamp) = strftime('%Y', 'now')")
+
+        # Get daily breakdown (last 30 days)
+        cursor.execute('''
+            SELECT
+                event_type,
+                DATE(timestamp) as date,
+                COUNT(*) as count,
+                COUNT(DISTINCT session_id) as unique_users
+            FROM demo_events
+            WHERE DATE(timestamp) >= DATE('now', '-30 days')
+            GROUP BY event_type, DATE(timestamp)
+            ORDER BY date DESC
+        ''')
+
+        daily = {}
+        daily_unique_users = {}
+        for event_type, date, count, unique in cursor.fetchall():
+            if event_type not in daily:
+                daily[event_type] = {}
+            daily[event_type][date] = count
+
+            if date not in daily_unique_users:
+                daily_unique_users[date] = 0
+            daily_unique_users[date] = max(daily_unique_users[date], unique)
+
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'totals': {
+                'events': all_time,
+                'unique_users': all_time_users
+            },
+            'today': {
+                'events': today,
+                'unique_users': today_users
+            },
+            'yesterday': {
+                'events': yesterday,
+                'unique_users': yesterday_users
+            },
+            'this_week': {
+                'events': this_week,
+                'unique_users': this_week_users
+            },
+            'month_to_date': {
+                'events': month_to_date,
+                'unique_users': mtd_users
+            },
+            'year_to_date': {
+                'events': year_to_date,
+                'unique_users': ytd_users
+            },
+            'daily': daily,
+            'daily_unique_users': daily_unique_users
+        })
+
+    except Exception as e:
+        print(f"❌ Analytics error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/analytics/demo-dashboard', methods=['GET'])
+def demo_dashboard():
+    """Enhanced dashboard with unique users tracking"""
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Solthron Demo Analytics</title>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial;
+                padding: 40px;
+                background: #f5f5f5;
+            }
+            h1 { color: #333; margin-bottom: 10px; }
+            .time-filter {
+                display: flex;
+                gap: 10px;
+                margin: 20px 0 30px 0;
+                flex-wrap: wrap;
+            }
+            .time-btn {
+                padding: 10px 20px;
+                border: 2px solid #ddd;
+                background: white;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+            .time-btn:hover {
+                border-color: #ffff00;
+                background: #fffef0;
+            }
+            .time-btn.active {
+                border-color: #ffff00;
+                background: #ffff00;
+                color: #000;
+            }
+            .metrics {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 20px;
+                margin: 30px 0;
+            }
+            .card {
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                text-align: center;
+            }
+            .number {
+                font-size: 48px;
+                font-weight: bold;
+                color: #ffff00;
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                margin: 10px 0;
+            }
+            .label {
+                color: #666;
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .subtitle {
+                color: #999;
+                font-size: 12px;
+                margin-top: 8px;
+            }
+            table {
+                width: 100%;
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-top: 30px;
+            }
+            th {
+                background: #333;
+                color: white;
+                padding: 15px;
+                text-align: left;
+            }
+            td {
+                padding: 15px;
+                border-bottom: 1px solid #eee;
+            }
+            tr:hover { background: #f9f9f9; }
+            .pill-icon { color: #ffff00; font-size: 20px; }
+            .user-icon { color: #4CAF50; font-size: 20px; }
+        </style>
+    </head>
+    <body>
+        <h1>📊 Solthron Demo Analytics Dashboard</h1>
+        <p class="subtitle" id="currentView">Viewing: All Time</p>
+
+        <div class="time-filter">
+            <button class="time-btn" onclick="setTimeFilter('today')">Today</button>
+            <button class="time-btn" onclick="setTimeFilter('yesterday')">Yesterday</button>
+            <button class="time-btn" onclick="setTimeFilter('this_week')">This Week</button>
+            <button class="time-btn" onclick="setTimeFilter('month_to_date')">Month to Date</button>
+            <button class="time-btn" onclick="setTimeFilter('year_to_date')">Year to Date</button>
+            <button class="time-btn active" onclick="setTimeFilter('totals')">All Time</button>
+        </div>
+
+        <div class="metrics">
+            <div class="card">
+                <div class="label"><span class="user-icon">👥</span> Unique Users</div>
+                <div class="number" id="uniqueUsers">-</div>
+                <div class="subtitle">Distinct visitors</div>
+            </div>
+
+            <div class="card">
+                <div class="label">Page Visits</div>
+                <div class="number" id="pageVisits">-</div>
+                <div class="subtitle">Total page loads</div>
+            </div>
+
+            <div class="card">
+                <div class="label"><span class="pill-icon">💊</span> Pill Clicks</div>
+                <div class="number" id="pillClicks">-</div>
+                <div class="subtitle">Demo interactions</div>
+            </div>
+
+            <div class="card">
+                <div class="label">Get Started</div>
+                <div class="number" id="getStartedClicks">-</div>
+                <div class="subtitle">Extension downloads</div>
+            </div>
+        </div>
+
+        <h2>📅 Daily Breakdown (Last 30 Days)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Unique Users</th>
+                    <th>Page Visits</th>
+                    <th>Pill Clicks</th>
+                    <th>Get Started</th>
+                </tr>
+            </thead>
+            <tbody id="dailyTable"></tbody>
+        </table>
+
+        <script>
+            let statsData = null;
+            let currentFilter = 'totals';
+
+            fetch('/analytics/demo-stats')
+                .then(r => r.json())
+                .then(data => {
+                    statsData = data;
+                    updateMetrics('totals');
+                    updateDailyTable();
+                });
+
+            function setTimeFilter(filter) {
+                currentFilter = filter;
+
+                document.querySelectorAll('.time-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+
+                const labels = {
+                    'today': 'Today',
+                    'yesterday': 'Yesterday',
+                    'this_week': 'This Week (Last 7 Days)',
+                    'month_to_date': 'Month to Date',
+                    'year_to_date': 'Year to Date',
+                    'totals': 'All Time'
+                };
+                document.getElementById('currentView').textContent = 'Viewing: ' + labels[filter];
+
+                updateMetrics(filter);
+            }
+
+            function updateMetrics(filter) {
+                if (!statsData) return;
+
+                const data = statsData[filter];
+                const events = data.events || {};
+
+                document.getElementById('uniqueUsers').textContent = data.unique_users || 0;
+                document.getElementById('pageVisits').textContent = events.page_visits || 0;
+                document.getElementById('pillClicks').textContent = events.pill_clicks || 0;
+                document.getElementById('getStartedClicks').textContent = events.get_started_clicks || 0;
+            }
+
+            function updateDailyTable() {
+                if (!statsData) return;
+
+                const tbody = document.getElementById('dailyTable');
+                const daily = statsData.daily;
+                const uniqueUsers = statsData.daily_unique_users;
+
+                const dates = [...new Set([
+                    ...Object.keys(daily.page_visits || {}),
+                    ...Object.keys(daily.pill_clicks || {}),
+                    ...Object.keys(daily.get_started_clicks || {}),
+                    ...Object.keys(uniqueUsers || {})
+                ])].sort().reverse();
+
+                tbody.innerHTML = '';
+                dates.forEach(date => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td><strong>${date}</strong></td>
+                        <td>${uniqueUsers[date] || 0}</td>
+                        <td>${daily.page_visits?.[date] || 0}</td>
+                        <td>${daily.pill_clicks?.[date] || 0}</td>
+                        <td>${daily.get_started_clicks?.[date] || 0}</td>
+                    `;
+                });
+            }
+        </script>
+    </body>
+    </html>
+    '''
 
 if __name__ == '__main__':
     app.run(debug=True)
