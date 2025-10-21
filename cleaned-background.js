@@ -2,7 +2,7 @@ chrome.action.onClicked.addListener(async (tab) => {
  try {
    await chrome.tabs.sendMessage(tab.id, { action: "toggleExtension" });
  } catch (error) {
-   console.error('Error sending message:', error);
+   // Error sending message
  }
 });
 
@@ -12,7 +12,6 @@ async function getAuthToken() {
     const result = await chrome.storage.local.get(['authToken']);
     return result.authToken || null;
   } catch (error) {
-    console.error('Error getting auth token:', error);
     return null;
   }
 }
@@ -46,7 +45,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    
    const controller = new AbortController();
    const timeoutId = setTimeout(() => {
-     console.log(`Request timeout for mode: ${mode}`);
      controller.abort();
    }, mode === 'persona_generator' ? 30000 : 15000);
    
@@ -65,12 +63,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
        return response.json();
      })
      .then(data => {
-       console.log(`Success for mode ${mode}:`, data.status || 'completed');
        sendResponse({success: true, data});
      })
      .catch(error => {
        clearTimeout(timeoutId);
-       console.error('API error for mode:', mode, error);
        
        let errorMessage = error.message;
        if (error.name === 'AbortError') {
@@ -110,7 +106,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
      .then(data => sendResponse({success: true, data}))
      .catch(error => {
        clearTimeout(timeoutId);
-       console.error('Smart followups API error:', error);
        sendResponse({success: false, error: error.message});
      });
    });
@@ -140,12 +135,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
        return response.json();
      })
      .then(data => {
-       console.log('Magic pill enhancement success:', data);
        sendResponse({success: true, data});
      })
      .catch(error => {
        clearTimeout(timeoutId);
-       console.error('Magic pill API error:', error);
        
        let errorMessage = error.message;
        if (error.name === 'AbortError') {
@@ -159,6 +152,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    });
    return true;
  }
+
+// Gmail Enhancement Handler - Smart context-aware with mode support
+if (request.type === 'gmail_enhance') {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  
+  createHeaders().then(headers => {
+    fetch('https://afaque.pythonanywhere.com/gmail-enhance-smart', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        text: request.data.text,
+        context: request.data.context,
+        mode: request.data.mode || 'balanced'  // ← ADD THIS LINE: Pass mode with 'balanced' as default
+      }),
+      signal: controller.signal
+    })
+    .then(response => {
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      sendResponse({success: true, data: { email: data.email || data.prompt }});
+    })
+    .catch(error => {
+      clearTimeout(timeoutId);
+      
+      let errorMessage = error.message;
+      if (error.name === 'AbortError') {
+        errorMessage = 'Email enhancement timeout - please try with shorter text';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Network error - please check your connection';
+      }
+      
+      sendResponse({success: false, error: errorMessage});
+    });
+  });
+  return true;
+}
+
+
 
  // Image Processing Handler - USED for image features
  if (request.type === 'process_image') {
@@ -202,21 +239,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
            .then(data => sendResponse({success: true, data}))
            .catch(error => {
              clearTimeout(timeoutId);
-             console.error('Image processing API error:', error);
              sendResponse({success: false, error: error.message});
            });
          });
        };
        reader.onerror = () => {
          clearTimeout(timeoutId);
-         console.error('FileReader error');
          sendResponse({success: false, error: 'Failed to read image file'});
        };
        reader.readAsDataURL(blob);
      })
      .catch(error => {
        clearTimeout(timeoutId);
-       console.error('Image fetch error:', error);
        sendResponse({success: false, error: error.message});
      });
    return true;
