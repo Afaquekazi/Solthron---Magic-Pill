@@ -70,7 +70,6 @@ let aiPlatformCustomPromptBarObserver = null;
 let aiPlatformCustomPromptBarUpdatePosition = null;
 const aiPlatformModes = [
     { id: 'auto', label: '⚡ Auto Mode', description: 'Smart enhancement' },
-    { id: 'convert_balanced', label: '📝 Convert to Balanced Prompt', description: 'Convert to structured prompt' },
     { id: 'customize', label: '🎯 Customize', description: 'Custom conversion instructions' }
 ];
 
@@ -1557,6 +1556,10 @@ function showAIPlatformCustomPromptBar() {
         font-size: 14px;
         outline: none;
         min-width: 0;
+        box-shadow: none !important;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
     `;
 
     input.addEventListener('focus', () => {
@@ -1829,6 +1832,10 @@ function showCustomPromptBar() {
         font-size: 14px;
         outline: none;
         min-width: 0;
+        box-shadow: none !important;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
     `;
 
     // Input focus styling - minimal
@@ -2244,15 +2251,6 @@ async function proceedWithAIPlatformMode(text, platform, mode) {
             // Auto mode: use magic_pill_enhance
             requestData = {
                 type: 'magic_pill_enhance',
-                data: {
-                    text: text,
-                    platform: platform
-                }
-            };
-        } else if (mode === 'convert_balanced') {
-            // Convert to balanced prompt
-            requestData = {
-                type: 'convert_balanced',
                 data: {
                     text: text,
                     platform: platform
@@ -3095,7 +3093,7 @@ async function savePrompt(promptText) {
     // ✅ Check if a prompt is starred/active (append mode)
     if (isPromptStarActive && activePromptId) {
         try {
-            const data = await chrome.storage.sync.get('savedPrompts');
+            const data = await chrome.storage.local.get('savedPrompts');
             const savedPrompts = data.savedPrompts || [];
             const promptIndex = savedPrompts.findIndex(prompt => prompt.id === activePromptId);
             
@@ -3103,7 +3101,7 @@ async function savePrompt(promptText) {
                 // Append to existing prompt
                 savedPrompts[promptIndex].text += '\n\n' + promptText;
                 savedPrompts[promptIndex].timestamp = new Date().toISOString();
-                await chrome.storage.sync.set({ savedPrompts });
+                await chrome.storage.local.set({ savedPrompts });
                 return true;
             }
         } catch (error) {
@@ -3123,10 +3121,10 @@ async function savePrompt(promptText) {
         };
         
         try {
-            const data = await chrome.storage.sync.get('savedPrompts');
+            const data = await chrome.storage.local.get('savedPrompts');
             const savedPrompts = data.savedPrompts || [];
             savedPrompts.push(prompt);
-            await chrome.storage.sync.set({ savedPrompts });
+            await chrome.storage.local.set({ savedPrompts });
             return true;
         } catch (error) {
             console.error('Error saving prompt:', error);
@@ -3210,7 +3208,7 @@ function detectLanguage(text) {
 
 async function loadPrompts() {
     try {
-        const data = await chrome.storage.sync.get('savedPrompts');
+        const data = await chrome.storage.local.get('savedPrompts');
         let savedPrompts = data.savedPrompts || [];
         
         // ✅ NEW: Migration - Add titles to old prompts that don't have them
@@ -3225,7 +3223,7 @@ async function loadPrompts() {
         
         // Save migrated prompts back to storage
         if (needsUpdate) {
-            await chrome.storage.sync.set({ savedPrompts });
+            await chrome.storage.local.set({ savedPrompts });
             console.log('✅ Migrated', savedPrompts.length, 'prompts to new title format');
         }
         
@@ -3280,9 +3278,9 @@ async function loadWorkflows() {
 
 async function deletePrompt(promptId) {
     try {
-        const data = await chrome.storage.sync.get('savedPrompts');
+        const data = await chrome.storage.local.get('savedPrompts');
         const savedPrompts = (data.savedPrompts || []).filter(p => p.id !== promptId);
-        await chrome.storage.sync.set({ savedPrompts });
+        await chrome.storage.local.set({ savedPrompts });
         return true;
     } catch (error) {
         console.error('Error deleting prompt:', error);
@@ -3420,7 +3418,7 @@ async function renameSavedChat(chatId, newTitle) {
 
 async function renamePrompt(promptId, newTitle) {
     try {
-        const data = await chrome.storage.sync.get('savedPrompts');
+        const data = await chrome.storage.local.get('savedPrompts');
         const savedPrompts = data.savedPrompts || [];
         const promptIndex = savedPrompts.findIndex(prompt => prompt.id === promptId);
         
@@ -3440,7 +3438,7 @@ async function renamePrompt(promptId, newTitle) {
                 contentPreview: savedPrompts[promptIndex].text.substring(0, 50)
             });
             
-            await chrome.storage.sync.set({ savedPrompts });
+            await chrome.storage.local.set({ savedPrompts });
             return true;
         }
         return false;
@@ -5494,10 +5492,10 @@ saveBtn.addEventListener('click', async () => {
     
     try {
         // Save to storage
-        const data = await chrome.storage.sync.get('savedPrompts');
+        const data = await chrome.storage.local.get('savedPrompts');
         const savedPrompts = data.savedPrompts || [];
         savedPrompts.push(newPrompt);
-        await chrome.storage.sync.set({ savedPrompts });
+        await chrome.storage.local.set({ savedPrompts });
         
         console.log('✅ New prompt saved:', title);
         
@@ -6203,19 +6201,27 @@ function attachGalleryEventListeners(galleryList) {
             `;
 
             // ✅ NEW: Prevent Claude (and other platforms) from stealing keyboard input
+            // BUT allow keyboard shortcuts (Alt, Ctrl, Cmd) to pass through
             input.addEventListener('keydown', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+                // Allow keyboard shortcuts to pass through
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
             }, true);
 
             input.addEventListener('keypress', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
             }, true);
 
             input.addEventListener('keyup', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
             }, true);
 
             input.addEventListener('input', (e) => {
@@ -6349,9 +6355,12 @@ function attachGalleryEventListeners(galleryList) {
             
             // Event listeners for input - ENHANCED for Claude compatibility
             input.addEventListener('keydown', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-                
+                // Allow keyboard shortcuts (Alt, Ctrl, Cmd) to pass through
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
+
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     saveRename();
@@ -6362,13 +6371,17 @@ function attachGalleryEventListeners(galleryList) {
             }, true);
 
             input.addEventListener('keypress', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
             }, true);
 
             input.addEventListener('keyup', (e) => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
             }, true);
 
             input.addEventListener('input', (e) => {
@@ -6824,10 +6837,22 @@ function attachStepEditListeners(workflow) {
                 overflow-y: auto;
             `;
             
-            // Prevent event propagation
-            input.addEventListener('keydown', (e) => e.stopPropagation(), true);
-            input.addEventListener('keypress', (e) => e.stopPropagation(), true);
-            input.addEventListener('keyup', (e) => e.stopPropagation(), true);
+            // Prevent event propagation (but allow keyboard shortcuts)
+            input.addEventListener('keydown', (e) => {
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                }
+            }, true);
+            input.addEventListener('keypress', (e) => {
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                }
+            }, true);
+            input.addEventListener('keyup', (e) => {
+                if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.stopPropagation();
+                }
+            }, true);
             input.addEventListener('input', (e) => e.stopPropagation(), true);
             
             // Create save button
