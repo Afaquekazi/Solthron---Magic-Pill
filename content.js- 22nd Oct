@@ -104,7 +104,7 @@ function getFeatureCredits(mode) {
     const explainModes = ['explain_meaning', 'explain_story', 'explain_eli5'];
     const aiAssistantModes = ['smart_followups']
     const imageModes = ['image_prompt']; // Removed image_caption
-    const freeModes = ['save_note', 'save_prompt', 'save_persona'];
+    const freeModes = ['save_note', 'save_persona'];
     const magicPillModes = ['magic_pill_enhance'];
 
     
@@ -3850,44 +3850,7 @@ async function processSelectedText(text) {
     solthronContainer.style.pointerEvents = 'auto';
     positionContainer(buttonRect);
     
-    // ✅ FIXED: Handle save features WITHOUT loading animation
-    if (selectedMode.startsWith('save_')) {
-        // Show button animation only, no loading bar
-        button.querySelector('.solthron-button').textContent = '...';
-        
-        // Clear any existing output states
-        outputText.classList.remove('placeholder', 'shimmer-loading', 'error');
-        outputText.textContent = 'Saving...';
-        
-        let saveFunction;
-        
-        if (selectedMode === 'save_prompt') {
-            saveFunction = savePrompt;
-        }
-        
-        if (await saveFunction(text)) {
-            button.querySelector('.solthron-button').textContent = '✓';
-            outputText.textContent = 'Saved successfully!';
-            
-            setTimeout(() => {
-                button.querySelector('.solthron-button').textContent = '➤';
-                // Open gallery after saving
-                closeAllSections();
-                const galleryView = shadowRoot.getElementById('gallery-view');
-                const galleryBtn = shadowRoot.getElementById('gallery-btn');
-                galleryView.style.display = 'block';
-                shadowRoot.querySelector('.output-container').style.display = 'none';
-                galleryBtn.querySelector('svg').style.stroke = '#00ff00';
-            }, 1000);
-        } else {
-            button.querySelector('.solthron-button').textContent = '✗';
-            outputText.textContent = 'Failed to save';
-            setTimeout(() => {
-                button.querySelector('.solthron-button').textContent = '➤';
-            }, 1000);
-        }
-        return;
-    }
+    // Note: save_prompt removed - use Alt+S keyboard shortcut instead
 
     // ✅ Show loading animation only for processing features
     showShimmerLoading('Processing...');
@@ -5014,16 +4977,14 @@ function createUI() {
                 <div class="solthron-header">
                     <div class="mode-dropdown">
                         <select class="mode-select">
-                            <optgroup label="Storage">
-                                <option value="save_prompt">Save as Prompt</option>
-                            </optgroup>
+                            <option value="select_mode">Select Mode</option>
                             <optgroup label="Image">
                                 <option value="image_prompt">Image to Prompt</option>
                             </optgroup>
                             <optgroup label="AI Assistant">
                                 <option value="smart_followups">Smart Follow-ups</option>
                             </optgroup>
-                        </select>                
+                        </select>
                     </div>
                     <div class="header-icons">
                         <button id="profile-btn" class="icon-button">
@@ -7282,7 +7243,8 @@ function initializeUIHandlers() {
     const closeBtn = shadowRoot.querySelector('#close-btn');
     const modeSelect = shadowRoot.querySelector('.mode-select');
 
-    selectedMode = localStorage.getItem('solthron-mode') || 'save_prompt';    modeSelect.value = selectedMode;
+    selectedMode = localStorage.getItem('solthron-mode') || 'select_mode';
+    modeSelect.value = selectedMode;
     solthronContainer.style.display = 'none';
     solthronContainer.style.pointerEvents = 'none';
 
@@ -7326,7 +7288,6 @@ function initializeUIHandlers() {
 
                 const placeholderMessages = {
                     image_prompt: 'Right-click an image to generate a prompt...',
-                    save_prompt: 'Highlight text and click to save as prompt...',
                     smart_followups: 'Right-click on an AI chat page to generate follow-up questions...',
                     default: 'Highlight text to begin...'
                 };    
@@ -7363,7 +7324,6 @@ function initializeUIHandlers() {
 
     const placeholderMessages = {
         image_prompt: 'Right-click an image to generate a prompt...',
-        save_prompt: 'Highlight text and double-click to save as prompt...',
         smart_followups: 'Right-click on an AI chat page to generate follow-up questions...',
         default: 'Highlight text to begin...'
     };
