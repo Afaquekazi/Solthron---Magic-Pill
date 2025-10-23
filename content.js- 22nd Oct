@@ -6769,10 +6769,25 @@ class WorkflowExecutor {
             }
         }
 
+        if (platform === 'chatgpt') {
+            try {
+                return await this.sendToChatGPT(prompt, stepIndex);
+            } catch (error) {
+                console.error('Error sending to ChatGPT, falling back to simulation:', error);
+
+                // Show notification about simulation mode
+                if (stepIndex === 0) {
+                    showNotification('⚠️ Running in simulation mode. For real execution, visit chatgpt.com', 'warning');
+                }
+
+                return await this.simulateResponse(prompt, stepIndex);
+            }
+        }
+
         // Fallback: simulate for testing
         if (stepIndex === 0) {
             const platformName = platform === 'unknown' ? 'this page' : platform;
-            showNotification(`ℹ️ Running in simulation mode on ${platformName}. Visit claude.ai for real execution.`, 'info');
+            showNotification(`ℹ️ Running in simulation mode on ${platformName}. Visit claude.ai or chatgpt.com for real execution.`, 'info');
         }
 
         return await this.simulateResponse(prompt, stepIndex);
@@ -6849,6 +6864,66 @@ class WorkflowExecutor {
 
         // Wait for user to submit and for response
         const response = await this.waitForUserSubmitAndResponse();
+
+        return response;
+    }
+
+    async sendToChatGPT(prompt, stepIndex) {
+        // Try multiple selectors to find ChatGPT's input field
+        const selectors = [
+            '#prompt-textarea',
+            'textarea[placeholder*="Message"]',
+            'textarea[data-id="root"]',
+            'textarea[placeholder*="ChatGPT"]',
+            'div[contenteditable="true"]'
+        ];
+
+        let inputField = null;
+
+        for (const selector of selectors) {
+            inputField = document.querySelector(selector);
+            if (inputField && inputField.offsetParent !== null) { // Check if visible
+                console.log(`✅ Found ChatGPT input field with selector: ${selector}`);
+                break;
+            }
+        }
+
+        if (!inputField) {
+            console.error('❌ Could not find ChatGPT input field. Tried selectors:', selectors);
+            throw new Error('Could not find ChatGPT input field. Please make sure you are on chatgpt.com');
+        }
+
+        // Clear existing content and insert the prompt
+        inputField.focus();
+        await this.sleep(100);
+
+        // Clear the field completely
+        if (inputField.tagName.toLowerCase() === 'textarea') {
+            inputField.value = '';
+            inputField.value = prompt;
+        } else {
+            inputField.textContent = '';
+            inputField.innerHTML = '';
+            inputField.textContent = prompt;
+        }
+
+        // Trigger input events so ChatGPT recognizes the text
+        inputField.dispatchEvent(new Event('input', { bubbles: true }));
+        inputField.dispatchEvent(new Event('change', { bubbles: true }));
+
+        console.log(`✅ Inserted prompt: "${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}"`);
+
+        // Small delay to ensure the text is processed
+        await this.sleep(500);
+
+        // ✅ MANUAL INTERVENTION: User needs to press Enter
+        console.log(`⏸ Step ${stepIndex + 1}: Prompt inserted. Waiting for user to press Enter...`);
+
+        // Show visual notification
+        showNotification(`📝 Step ${stepIndex + 1}: Please press Enter to submit the prompt`, 'info');
+
+        // Wait for user to submit and for response
+        const response = await this.waitForChatGPTUserSubmitAndResponse();
 
         return response;
     }
@@ -7086,6 +7161,242 @@ class WorkflowExecutor {
             // Also check periodically (every 1s) as a fallback
             checkIntervalId = setInterval(() => {
                 console.log('🔄 Periodic check for response completion...');
+                checkIfComplete();
+            }, 1000);
+
+            // Do an initial check after 500ms in case response already completed
+            setTimeout(() => checkIfComplete(), 500);
+        });
+    }
+
+    async waitForChatGPTUserSubmitAndResponse() {
+        console.log('⏳ Waiting for user to submit prompt on ChatGPT...');
+
+        // First, wait for user to press Enter (detect submission)
+        await this.waitForChatGPTUserSubmission();
+
+        console.log('✅ User submitted! Now waiting for ChatGPT response...');
+
+        // Then wait for the response to complete
+        return await this.waitForChatGPTResponse();
+    }
+
+    async waitForChatGPTUserSubmission() {
+        // Wait until we detect that the user has submitted the prompt
+        return new Promise((resolve, reject) => {
+            const maxWaitTime = 300000; // 5 minutes max wait for user to press Enter
+            const startTime = Date.now();
+            let checkIntervalId;
+            let observer;
+
+            const checkIfUserSubmitted = () => {
+                try {
+                    // Check if stop/regenerate button exists (means user submitted and response is generating)
+                    const stopButtonSelectors = [
+                        'button[aria-label="Stop generating"]',
+                        'button[aria-label*="Stop"]',
+                        'button[data-testid="stop-button"]',
+                        'button svg.icon-md' // Stop icon
+                    ];
+
+                    let stopButton = null;
+                    for (const selector of stopButtonSelectors) {
+                        try {
+                            stopButton = document.querySelector(selector);
+                            if (stopButton && stopButton.offsetParent !== null) {
+                                console.log('✅ Detected user submission on ChatGPT (Stop button appeared)');
+                                clearInterval(checkIntervalId);
+                                if (observer) observer.disconnect();
+                                resolve();
+                                return;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+
+                    // Check if textarea is empty (might indicate submission)
+                    const textarea = document.querySelector('#prompt-textarea, textarea[placeholder*="Message"]');
+                    if (textarea && textarea.value.trim() === '') {
+                        console.log('⏳ Input field cleared, confirming submission...');
+                    }
+
+                    // Timeout check
+                    if (Date.now() - startTime > maxWaitTime) {
+                        clearInterval(checkIntervalId);
+                        if (observer) observer.disconnect();
+                        reject(new Error('Timeout waiting for user to submit prompt on ChatGPT'));
+                    }
+                } catch (error) {
+                    console.error('Error checking user submission on ChatGPT:', error);
+                }
+            };
+
+            // Check every 300ms
+            checkIntervalId = setInterval(checkIfUserSubmitted, 300);
+
+            // Also use MutationObserver for immediate detection
+            observer = new MutationObserver(() => {
+                checkIfUserSubmitted();
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+        });
+    }
+
+    async waitForChatGPTResponse() {
+        console.log('⏳ Waiting for ChatGPT response to complete...');
+
+        // Give ChatGPT a moment to start responding
+        await this.sleep(1000);
+
+        return new Promise((resolve, reject) => {
+            let timeoutId;
+            let checkIntervalId;
+            let responseStarted = false;
+            let lastMessageCount = 0;
+            const maxWaitTime = 120000; // 2 minutes max
+            const startTime = Date.now();
+
+            const extractResponse = () => {
+                // Try multiple methods to extract the ChatGPT response text
+                const messageSelectors = [
+                    '[data-message-author-role="assistant"]',
+                    '.markdown.prose',
+                    'article[class*="group"]',
+                    '[class*="markdown"]',
+                    '.text-base'
+                ];
+
+                let responseText = '';
+                let usedSelector = '';
+
+                for (const selector of messageSelectors) {
+                    const messages = document.querySelectorAll(selector);
+                    if (messages.length > 0) {
+                        const lastMessage = messages[messages.length - 1];
+                        responseText = lastMessage.textContent || lastMessage.innerText || '';
+
+                        if (responseText.trim().length > 0) {
+                            usedSelector = selector;
+                            console.log(`✅ Extracted ChatGPT response using selector: ${selector} (${responseText.length} chars)`);
+                            break;
+                        }
+                    }
+                }
+
+                return { text: responseText, selector: usedSelector };
+            };
+
+            const checkIfComplete = () => {
+                try {
+                    // Check if stop button exists (response is still generating)
+                    const stopButtonSelectors = [
+                        'button[aria-label="Stop generating"]',
+                        'button[aria-label*="Stop"]',
+                        'button[data-testid="stop-button"]'
+                    ];
+
+                    let stopButton = null;
+                    for (const selector of stopButtonSelectors) {
+                        try {
+                            stopButton = document.querySelector(selector);
+                            if (stopButton && stopButton.offsetParent !== null) {
+                                break;
+                            } else {
+                                stopButton = null;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+
+                    if (stopButton) {
+                        if (!responseStarted) {
+                            responseStarted = true;
+                            console.log('✅ ChatGPT response generation started (detected Stop button)');
+                        }
+                        return; // Still generating
+                    }
+
+                    // No stop button visible - response might be complete
+                    // Try to extract the response
+                    const { text, selector } = extractResponse();
+
+                    // Validate response has meaningful content
+                    const MIN_RESPONSE_LENGTH = 50;
+
+                    if (text.trim().length > MIN_RESPONSE_LENGTH) {
+                        // Check if this is a new message (not the user's prompt)
+                        const messages = document.querySelectorAll(selector);
+                        if (messages.length > lastMessageCount) {
+                            // New message appeared!
+                            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                            console.log(`✅ ChatGPT response complete in ${elapsed}s (${text.length} chars)`);
+
+                            clearTimeout(timeoutId);
+                            clearInterval(checkIntervalId);
+                            observer.disconnect();
+                            resolve(text);
+                        } else if (responseStarted) {
+                            // We saw it start and now stop button is gone
+                            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                            console.log(`✅ ChatGPT response complete in ${elapsed}s (after generation, ${text.length} chars)`);
+
+                            clearTimeout(timeoutId);
+                            clearInterval(checkIntervalId);
+                            observer.disconnect();
+                            resolve(text);
+                        }
+                    } else if (text.trim().length > 0) {
+                        // Response too short - probably placeholder text
+                        console.log(`⏳ Response detected but too short (${text.length} chars), waiting for more...`);
+                    }
+                } catch (error) {
+                    console.error('Error checking ChatGPT response completion:', error);
+                }
+            };
+
+            // Count initial messages
+            const initialMessages = document.querySelectorAll('[data-message-author-role="assistant"]');
+            lastMessageCount = initialMessages.length;
+            console.log(`📊 Initial ChatGPT message count: ${lastMessageCount}`);
+
+            // Set timeout
+            timeoutId = setTimeout(() => {
+                clearInterval(checkIntervalId);
+                observer.disconnect();
+
+                // Try one last time to extract response before timing out
+                const { text } = extractResponse();
+                if (text.trim().length > 0) {
+                    console.warn('⚠️ Timeout reached but found ChatGPT response, using it');
+                    resolve(text);
+                } else {
+                    console.error('❌ Response timeout after 2 minutes');
+                    reject(new Error('Response timeout - ChatGPT took too long to respond'));
+                }
+            }, maxWaitTime);
+
+            // Watch for DOM changes
+            const observer = new MutationObserver(() => {
+                checkIfComplete();
+            });
+
+            // Start observing
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+
+            // Also check periodically (every 1s) as a fallback
+            checkIntervalId = setInterval(() => {
+                console.log('🔄 Periodic check for ChatGPT response completion...');
                 checkIfComplete();
             }, 1000);
 
