@@ -5993,6 +5993,258 @@ Output only the polished email, nothing else."""
     except Exception as e:
         return jsonify({'error': 'Failed to enhance email', 'details': str(e)}), 500
 
+@app.route('/gmail-enhance-custom', methods=['POST'])
+def gmail_enhance_custom():
+    """Gmail email enhancement with custom user instructions"""
+    try:
+        # Credit check - 15 credits for custom Gmail enhancement
+        credit_result = optional_credit_check('gmail_enhance')
+        if not credit_result['success']:
+            return jsonify({
+                'error': credit_result['message'],
+                'credits_required': 15  # Custom enhancement costs 15 credits
+            }), 402
+
+        data = request.get_json()
+        email_text = data.get('text', '').strip()
+        context = data.get('context', {})
+        custom_prompt = data.get('customPrompt', '').strip()
+
+        if not email_text:
+            return jsonify({'error': 'Email text is required'}), 400
+
+        if not custom_prompt:
+            return jsonify({'error': 'Custom prompt is required'}), 400
+
+        print(f"🎯 Custom Gmail enhancement for: {email_text[:50]}...")
+        print(f"🎯 Custom instruction: {custom_prompt}")
+        print(f"📧 Context: Reply={context.get('isReply')}, Recipients={len(context.get('recipients', []))}")
+
+        # Build custom enhancement prompt
+        enhancement_prompt = f"""You are an expert email communication specialist who helps enhance emails based on custom user instructions.
+
+CRITICAL RULES:
+1. NEVER add placeholder text like [Name], [Date], [Time], etc.
+2. KEEP all actual names, details, and specifics the user already wrote
+3. Apply the user's custom instruction while preserving the core message
+4. Don't add information that wasn't implied in the original email
+
+Original email:
+{email_text}
+
+Email context:
+- Is this a reply? {context.get('isReply', False)}
+- Subject line: {context.get('subject', 'No subject')}
+- Formal context: {context.get('isFormal', False)}
+- Recipients: {', '.join(context.get('recipients', ['Unknown'])[:3]) if context.get('recipients') else 'Unknown'}
+
+USER'S CUSTOM INSTRUCTION:
+{custom_prompt}
+
+YOUR TASK:
+
+1. APPLY the user's custom instruction to the email
+2. PRESERVE the core message and all specific details
+3. MAINTAIN the original facts, names, dates, and context
+4. ENHANCE according to the instruction while keeping it natural
+
+WHAT TO DO:
+✅ Apply the custom instruction faithfully
+✅ Keep all actual names and details
+✅ Preserve the email's purpose
+✅ Make natural improvements that align with the instruction
+✅ Fix grammar if needed (unless instruction says otherwise)
+
+WHAT NOT TO DO:
+❌ Don't add placeholder text like [Name], [Date], etc.
+❌ Don't add greetings if instruction doesn't require them
+❌ Don't add information not in the original
+❌ Don't change the meaning unless instruction explicitly requires it
+❌ Don't ignore the user's instruction
+❌ Don't add signature blocks or quoted text
+
+EXAMPLES:
+
+Example 1:
+Original: "hey can we meet tomorrow i have some ideas"
+Instruction: "remove casual language"
+Result: "Can we meet tomorrow? I have some ideas to discuss."
+
+Example 2:
+Original: "I need the reports by Friday. Thanks."
+Instruction: "make it sound more urgent"
+Result: "I urgently need the reports by Friday. This is time-sensitive, so please prioritize it. Thanks."
+
+Example 3:
+Original: "Sorry for the delay. Here are the files you requested."
+Instruction: "remove apology"
+Result: "Here are the files you requested."
+
+Remember: Apply the user's instruction while preserving the original email's content and specifics.
+
+Provide ONLY the enhanced email text - no explanations, no meta-commentary."""
+
+        response = client.chat.completions.create(
+            model="gpt-5-chat-latest",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an email enhancement expert who applies custom user instructions to emails. Always preserve actual details and never add placeholder text. Follow the user's instruction precisely."
+                },
+                {
+                    "role": "user",
+                    "content": enhancement_prompt
+                }
+            ],
+            temperature=0.4,
+            max_tokens=800
+        )
+
+        enhanced_email = response.choices[0].message.content.strip()
+
+        # Clean up any meta text if accidentally included
+        if enhanced_email.startswith("Enhanced email:"):
+            enhanced_email = enhanced_email.replace("Enhanced email:", "").strip()
+        if enhanced_email.startswith("Result:"):
+            enhanced_email = enhanced_email.replace("Result:", "").strip()
+        if enhanced_email.startswith("Here's"):
+            lines = enhanced_email.split('\n')
+            enhanced_email = '\n'.join(lines[1:]).strip()
+
+        result = {
+            'success': True,
+            'email': enhanced_email,
+            'status': 'success',
+            'platform': 'gmail',
+            'original_length': len(email_text),
+            'enhanced_length': len(enhanced_email),
+            'metadata': {
+                'mode': 'gmail_enhance_custom',
+                'custom_instruction': custom_prompt,
+                'is_reply': context.get('isReply', False),
+                'recipient_count': len(context.get('recipients', []))
+            }
+        }
+
+        if credit_result.get('credits_used'):
+            result['credits_used'] = credit_result['credits_used']
+            result['credits_remaining'] = credit_result.get('remaining')
+
+        print(f"✅ Custom Gmail enhancement complete - {len(email_text)} → {len(enhanced_email)} chars")
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"❌ Custom Gmail enhancement error: {e}")
+        return jsonify({
+            'error': 'Failed to enhance email with custom instruction',
+            'details': str(e)
+        }), 500
+
+@app.route('/ai-platform-custom', methods=['POST'])
+def ai_platform_custom():
+    """Enhance user prompts with custom instructions before sending to ChatGPT"""
+    try:
+        # Credit check - 15 credits for custom prompt enhancement
+        credit_result = optional_credit_check('convert_custom')
+        if not credit_result['success']:
+            return jsonify({
+                'error': credit_result['message'],
+                'credits_required': 15
+            }), 402
+
+        data = request.get_json()
+        original_prompt = data.get('text', '').strip()
+        enhancement_instruction = data.get('customPrompt', '').strip()
+
+        if not original_prompt:
+            return jsonify({'error': 'Original prompt is required'}), 400
+
+        if not enhancement_instruction:
+            return jsonify({'error': 'Enhancement instruction is required'}), 400
+
+        print(f"🎯 Enhancing prompt: {original_prompt[:50]}...")
+        print(f"📝 Enhancement: {enhancement_instruction}")
+
+        # Build the enhancement prompt - works exactly like ChatGPT
+        system_prompt = """You are ChatGPT, helping a user refine their prompt. The user has written a prompt and wants to improve it based on a specific instruction.
+
+Your task: Apply their enhancement instruction naturally to make the prompt better, just like you would in a normal conversation.
+
+Rules:
+- Understand what they're asking for and apply it naturally
+- Keep their original intent and core request
+- Be creative and thoughtful in how you enhance it
+- Output ONLY the enhanced/refined prompt, nothing else
+- Don't add meta-commentary or explanations"""
+
+        user_prompt = f"""I have this prompt:
+"{original_prompt}"
+
+Can you refine it to: {enhancement_instruction}
+
+Just give me the refined prompt, nothing else."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Using latest GPT-4o for best results
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,  # Natural ChatGPT-like creativity
+            max_tokens=2000   # Allow for comprehensive enhancements
+        )
+
+        enhanced_prompt = response.choices[0].message.content.strip()
+
+        # Clean up any wrapper text
+        prefixes_to_remove = [
+            "Enhanced prompt:",
+            "Here's the enhanced prompt:",
+            "Result:",
+            "Enhanced version:",
+            "Improved prompt:"
+        ]
+
+        for prefix in prefixes_to_remove:
+            if enhanced_prompt.startswith(prefix):
+                enhanced_prompt = enhanced_prompt[len(prefix):].strip()
+
+        # Remove quotes if the entire response is wrapped in them
+        if (enhanced_prompt.startswith('"') and enhanced_prompt.endswith('"')) or \
+           (enhanced_prompt.startswith("'") and enhanced_prompt.endswith("'")):
+            enhanced_prompt = enhanced_prompt[1:-1].strip()
+
+        result = {
+            'success': True,
+            'converted_prompt': enhanced_prompt,
+            'status': 'success',
+            'original_length': len(original_prompt),
+            'converted_length': len(enhanced_prompt),
+            'metadata': {
+                'mode': 'custom_enhancement',
+                'enhancement_instruction': enhancement_instruction,
+                'improvement_ratio': round(len(enhanced_prompt) / len(original_prompt), 2)
+            }
+        }
+
+        if credit_result.get('credits_used'):
+            result['credits_used'] = credit_result['credits_used']
+            result['credits_remaining'] = credit_result.get('remaining')
+
+        print(f"✅ Prompt enhanced: {len(original_prompt)} → {len(enhanced_prompt)} chars")
+        print(f"📊 Enhancement preview: {enhanced_prompt[:100]}...")
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"❌ Prompt enhancement error: {e}")
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            'error': 'Failed to enhance prompt',
+            'details': str(e)
+        }), 500
 
 @app.route('/auto-smart-actions', methods=['POST'])
 def auto_smart_actions():
