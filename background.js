@@ -30,30 +30,26 @@ async function createHeaders() {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+ // Main text enhancement handler - USED
  if (request.type === 'enhance_text') {
-   // Determine the endpoint based on mode
    const mode = request.data.mode || 'enhance';
    let endpoint = 'generate';
    let requestBody = { ...request.data, mode: mode };
    
-   // Route to persona generator endpoint if mode is persona_generator
    if (mode === 'persona_generator') {
      endpoint = 'generate-persona';
-     // Map 'topic' to 'text' for persona endpoint
      requestBody = {
        text: request.data.topic,
        mode: mode
      };
    }
    
-   // Create AbortController for timeout handling
    const controller = new AbortController();
    const timeoutId = setTimeout(() => {
      console.log(`Request timeout for mode: ${mode}`);
      controller.abort();
-   }, mode === 'persona_generator' ? 30000 : 15000); // 30s for persona, 15s for others
+   }, mode === 'persona_generator' ? 30000 : 15000);
    
-   // Get headers with auth token
    createHeaders().then(headers => {
      fetch(`https://afaque.pythonanywhere.com/${endpoint}`, {
        method: 'POST',
@@ -76,7 +72,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
        clearTimeout(timeoutId);
        console.error('API error for mode:', mode, error);
        
-       // Better error handling for different scenarios
        let errorMessage = error.message;
        if (error.name === 'AbortError') {
          errorMessage = `Request timeout - ${mode === 'persona_generator' ? 'AI analysis' : 'processing'} took too long`;
@@ -90,94 +85,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    return true;
  }
 
- if (request.type === 'explain_meaning') {
-   const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 15000);
-   
-   createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/explain-meaning', {
-       method: 'POST',
-       headers: headers,
-       body: JSON.stringify(request.data),
-       signal: controller.signal
-     })
-     .then(response => {
-       clearTimeout(timeoutId);
-       if (!response.ok) {
-         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-       }
-       return response.json();
-     })
-     .then(data => sendResponse({success: true, data}))
-     .catch(error => {
-       clearTimeout(timeoutId);
-       console.error('Explain meaning API error:', error);
-       sendResponse({success: false, error: error.message});
-     });
-   });
-   return true;
- }
-
- if (request.type === 'explain_story') {
-   const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 15000);
-   
-   createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/explain-story', {
-       method: 'POST',
-       headers: headers,
-       body: JSON.stringify(request.data),
-       signal: controller.signal
-     })
-     .then(response => {
-       clearTimeout(timeoutId);
-       if (!response.ok) {
-         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-       }
-       return response.json();
-     })
-     .then(data => sendResponse({success: true, data}))
-     .catch(error => {
-       clearTimeout(timeoutId);
-       console.error('Explain story API error:', error);
-       sendResponse({success: false, error: error.message});
-     });
-   });
-   return true;
- }
-
- if (request.type === 'explain_eli5') {
-   const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 15000);
-   
-   createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/explain-eli5', {
-       method: 'POST',
-       headers: headers,
-       body: JSON.stringify(request.data),
-       signal: controller.signal
-     })
-     .then(response => {
-       clearTimeout(timeoutId);
-       if (!response.ok) {
-         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-       }
-       return response.json();
-     })
-     .then(data => sendResponse({success: true, data}))
-     .catch(error => {
-       clearTimeout(timeoutId);
-       console.error('Explain ELI5 API error:', error);
-       sendResponse({success: false, error: error.message});
-     });
-   });
-   return true;
- }
-
- // Smart Followups Handler
+ // Smart Followups Handler - USED in content.js contextmenu
  if (request.type === 'smart_followups') {
    const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s for followups
+   const timeoutId = setTimeout(() => controller.abort(), 20000);
    
    createHeaders().then(headers => {
      fetch('https://afaque.pythonanywhere.com/smart-followups', {
@@ -206,17 +117,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    return true;
  }
 
- // Smart Actions Handler
- if (request.type === 'smart_actions') {
+ // Magic Pill Enhancement Handler - USED by Magic Pill feature
+ if (request.type === 'magic_pill_enhance') {
    const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s for actions
+   const timeoutId = setTimeout(() => controller.abort(), 20000);
    
    createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/smart-actions', {
+     fetch('https://afaque.pythonanywhere.com/magic-pill-enhance', {
        method: 'POST',
        headers: headers,
        body: JSON.stringify({
-         conversation: request.data.conversation,
+         text: request.data.text,
          platform: request.data.platform
        }),
        signal: controller.signal
@@ -229,17 +140,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
        return response.json();
      })
      .then(data => {
-       console.log('Smart actions success:', data);
+       console.log('Magic pill enhancement success:', data);
        sendResponse({success: true, data});
      })
      .catch(error => {
        clearTimeout(timeoutId);
-       console.error('Smart actions API error:', error);
+       console.error('Magic pill API error:', error);
        
-       // Better error handling for different scenarios
        let errorMessage = error.message;
        if (error.name === 'AbortError') {
-         errorMessage = 'Action analysis timeout - please try again';
+         errorMessage = 'Magic pill enhancement timeout - please try with shorter text';
        } else if (error.message.includes('Failed to fetch')) {
          errorMessage = 'Network error - please check your connection';
        }
@@ -250,245 +160,251 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
    return true;
  }
 
-// Auto Smart Actions Handler (NEW)
- if (request.type === 'auto_smart_actions') {
-   const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s for auto actions
-   
-   createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/auto-smart-actions', {
-       method: 'POST',
-       headers: headers,
-       body: JSON.stringify({
-         conversation: request.data.conversation,
-         platform: request.data.platform
-       }),
-       signal: controller.signal
-     })
-     .then(response => {
+ // Gmail Enhancement Handler - USED by Gmail Magic Pill feature
+ if (request.type === 'gmail_enhance') {
+   console.log('📧 Gmail enhancement request:', {
+     text: request.data.text?.substring(0, 50) + '...',
+     mode: request.data.mode
+   });
+
+   (async () => {
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+     try {
+       const headers = await createHeaders();
+
+       const response = await fetch('https://afaque.pythonanywhere.com/gmail-enhance', {
+         method: 'POST',
+         headers: headers,
+         body: JSON.stringify({
+           text: request.data.text,
+           platform: request.data.platform,
+           context: request.data.context,
+           mode: request.data.mode
+         }),
+         signal: controller.signal
+       });
+
        clearTimeout(timeoutId);
+       const data = await response.json();
+
        if (!response.ok) {
-         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+         console.error('❌ Backend error:', response.status, data);
+         sendResponse({
+           success: false,
+           error: data.error || `HTTP ${response.status}: ${response.statusText}`
+         });
+         return;
        }
-       return response.json();
-     })
-     .then(data => {
-       console.log('Auto smart actions success:', data);
+
+       console.log('✅ Gmail enhancement success:', data);
        sendResponse({success: true, data});
-     })
-     .catch(error => {
+
+     } catch (error) {
        clearTimeout(timeoutId);
-       console.error('Auto smart actions API error:', error);
-       
-       // Better error handling for different scenarios
-       let errorMessage = error.message;
+       console.error('❌ Gmail enhancement API error:', error);
+
+       let errorMessage = error.message || 'Unknown error';
        if (error.name === 'AbortError') {
-         errorMessage = 'Auto action analysis timeout - please try again';
-       } else if (error.message.includes('Failed to fetch')) {
+         errorMessage = 'Gmail enhancement timeout - please try with shorter text';
+       } else if (errorMessage.includes('Failed to fetch')) {
          errorMessage = 'Network error - please check your connection';
        }
-       
+
        sendResponse({success: false, error: errorMessage});
-     });
-   });
+     }
+   })();
+
    return true;
  }
 
- // Smart Enhancements Handler
- if (request.type === 'smart_enhancements') {
-   const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s for enhancements
-   
-   createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/smart-enhancements', {
-       method: 'POST',
-       headers: headers,
-       body: JSON.stringify({
-         text: request.data.text
-       }),
-       signal: controller.signal
-     })
-     .then(response => {
+ // Gmail Custom Prompt Enhancement Handler - USED by Gmail Custom Prompt feature
+ if (request.type === 'gmail_enhance_custom') {
+   console.log('🎯 Gmail custom enhancement request:', {
+     text: request.data.text?.substring(0, 50) + '...',
+     customPrompt: request.data.customPrompt
+   });
+
+   (async () => {
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+     try {
+       const headers = await createHeaders();
+
+       const response = await fetch('https://afaque.pythonanywhere.com/gmail-enhance-custom', {
+         method: 'POST',
+         headers: headers,
+         body: JSON.stringify({
+           text: request.data.text,
+           platform: request.data.platform,
+           context: request.data.context,
+           customPrompt: request.data.customPrompt
+         }),
+         signal: controller.signal
+       });
+
        clearTimeout(timeoutId);
+       const data = await response.json();
+
        if (!response.ok) {
-         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+         console.error('❌ Backend error:', response.status, data);
+         sendResponse({
+           success: false,
+           error: data.error || `HTTP ${response.status}: ${response.statusText}`
+         });
+         return;
        }
-       return response.json();
-     })
-     .then(data => {
-       console.log('Smart enhancements success:', data);
+
+       console.log('✅ Gmail custom enhancement success:', data);
        sendResponse({success: true, data});
-     })
-     .catch(error => {
+
+     } catch (error) {
        clearTimeout(timeoutId);
-       console.error('Smart enhancements API error:', error);
-       
-       // Better error handling for different scenarios
-       let errorMessage = error.message;
+       console.error('❌ Gmail custom enhancement API error:', error);
+
+       let errorMessage = error.message || 'Unknown error';
        if (error.name === 'AbortError') {
-         errorMessage = 'Enhancement analysis timeout - please try with shorter text';
-       } else if (error.message.includes('Failed to fetch')) {
+         errorMessage = 'Gmail custom enhancement timeout - please try with shorter text';
+       } else if (errorMessage.includes('Failed to fetch')) {
          errorMessage = 'Network error - please check your connection';
        }
-       
+
        sendResponse({success: false, error: errorMessage});
-     });
-   });
+     }
+   })();
+
    return true;
  }
 
-// ADD THIS HANDLER TO YOUR BACKGROUND.JS FILE
-// Insert this right after your smart_enhancements handler and before the image processing handler
+ // Gmail Smart Reply - Analyze Email Questions Handler
+ if (request.type === 'analyze_email_questions') {
+   console.log('🔍 Analyzing email for questions:', {
+     emailBody: request.data.emailBody?.substring(0, 50) + '...'
+   });
 
-// Magic Pill Enhancement Handler
-if (request.type === 'magic_pill_enhance') {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s for magic pill
-  
-  createHeaders().then(headers => {
-    fetch('https://afaque.pythonanywhere.com/magic-pill-enhance', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        text: request.data.text,
-        platform: request.data.platform
-      }),
-      signal: controller.signal
-    })
-    .then(response => {
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Magic pill enhancement success:', data);
-      sendResponse({success: true, data});
-    })
-    .catch(error => {
-      clearTimeout(timeoutId);
-      console.error('Magic pill API error:', error);
-      
-      // Better error handling for different scenarios
-      let errorMessage = error.message;
-      if (error.name === 'AbortError') {
-        errorMessage = 'Magic pill enhancement timeout - please try with shorter text';
-      } else if (error.message.includes('Failed to fetch')) {
-        errorMessage = 'Network error - please check your connection';
-      }
-      
-      sendResponse({success: false, error: errorMessage});
-    });
-  });
-  return true;
-}
+   (async () => {
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-// Intent Analysis Handler
-if (request.type === 'analyze_user_intent') {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s for intent analysis
-  
-  createHeaders().then(headers => {
-    fetch('https://afaque.pythonanywhere.com/analyze-user-intent', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        prompts: request.data.prompts,
-        sessionId: request.data.sessionId,
-        platform: request.data.platform
-      }),
-      signal: controller.signal
-    })
-    .then(response => {
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Intent analysis success:', data);
-      sendResponse({success: true, data});
-    })
-    .catch(error => {
-      clearTimeout(timeoutId);
-      console.error('Intent analysis API error:', error);
-      
-      // Better error handling for different scenarios
-      let errorMessage = error.message;
-      if (error.name === 'AbortError') {
-        errorMessage = 'Intent analysis timeout - please try again';
-      } else if (error.message.includes('Failed to fetch')) {
-        errorMessage = 'Network error - please check your connection';
-      }
-      
-      sendResponse({success: false, error: errorMessage});
-    });
-  });
-  return true;
-}
+     try {
+       const headers = await createHeaders();
 
-// Context-Aware Magic Pill Handler
-if (request.type === 'context_aware_magic_pill') {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s for context-aware enhancement
-  
-  createHeaders().then(headers => {
-    fetch('https://afaque.pythonanywhere.com/context-aware-magic-pill', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        text: request.data.text,
-        isNewChat: request.data.isNewChat,
-        promptType: request.data.promptType,
-        userSession: request.data.userSession,
-        platform: request.data.platform
-      }),
-      signal: controller.signal
-    })
-    .then(response => {
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Context-aware magic pill success:', data);
-      sendResponse({success: true, data});
-    })
-    .catch(error => {
-      clearTimeout(timeoutId);
-      console.error('Context-aware magic pill API error:', error);
-      
-      // Better error handling for different scenarios
-      let errorMessage = error.message;
-      if (error.name === 'AbortError') {
-        errorMessage = 'Context-aware enhancement timeout - please try with shorter text';
-      } else if (error.message.includes('Failed to fetch')) {
-        errorMessage = 'Network error - please check your connection';
-      }
-      
-      sendResponse({success: false, error: errorMessage});
-    });
-  });
-  return true;
-}
+       const response = await fetch('https://afaque.pythonanywhere.com/analyze-email-questions', {
+         method: 'POST',
+         headers: headers,
+         body: JSON.stringify({
+           emailBody: request.data.emailBody,
+           context: request.data.context
+         }),
+         signal: controller.signal
+       });
 
- // Image Processing Handler
+       clearTimeout(timeoutId);
+       const data = await response.json();
+
+       if (!response.ok) {
+         console.error('❌ Backend error:', response.status, data);
+         sendResponse({
+           success: false,
+           error: data.error || `HTTP ${response.status}: ${response.statusText}`
+         });
+         return;
+       }
+
+       console.log('✅ Email analysis success:', data);
+       sendResponse({success: true, data});
+
+     } catch (error) {
+       clearTimeout(timeoutId);
+       console.error('❌ Email analysis API error:', error);
+
+       let errorMessage = error.message || 'Unknown error';
+       if (error.name === 'AbortError') {
+         errorMessage = 'Email analysis timeout - please try again';
+       } else if (errorMessage.includes('Failed to fetch')) {
+         errorMessage = 'Network error - please check your connection';
+       }
+
+       sendResponse({success: false, error: errorMessage});
+     }
+   })();
+
+   return true;
+ }
+
+ // Gmail Smart Reply - Generate Reply Handler
+ if (request.type === 'gmail_smart_reply_generate') {
+   console.log('✨ Generating smart reply:', {
+     questionsCount: request.data.questions?.length,
+     answersCount: Object.keys(request.data.answers || {}).length
+   });
+
+   (async () => {
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+     try {
+       const headers = await createHeaders();
+
+       const response = await fetch('https://afaque.pythonanywhere.com/gmail-smart-reply', {
+         method: 'POST',
+         headers: headers,
+         body: JSON.stringify({
+           emailBody: request.data.emailBody,
+           context: request.data.context,
+           questions: request.data.questions,
+           answers: request.data.answers
+         }),
+         signal: controller.signal
+       });
+
+       clearTimeout(timeoutId);
+       const data = await response.json();
+
+       if (!response.ok) {
+         console.error('❌ Backend error:', response.status, data);
+         sendResponse({
+           success: false,
+           error: data.error || `HTTP ${response.status}: ${response.statusText}`
+         });
+         return;
+       }
+
+       console.log('✅ Smart reply generation success:', data);
+       sendResponse({success: true, data});
+
+     } catch (error) {
+       clearTimeout(timeoutId);
+       console.error('❌ Smart reply generation API error:', error);
+
+       let errorMessage = error.message || 'Unknown error';
+       if (error.name === 'AbortError') {
+         errorMessage = 'Reply generation timeout - please try with shorter content';
+       } else if (errorMessage.includes('Failed to fetch')) {
+         errorMessage = 'Network error - please check your connection';
+       }
+
+       sendResponse({success: false, error: errorMessage});
+     }
+   })();
+
+   return true;
+ }
+
+ // Image Processing Handler - USED for image features
  if (request.type === 'process_image') {
    const imageUrl = request.data.imageUrl;
    const mode = request.data.mode;
-   
-   // Determine endpoint based on image mode
-   const endpoint = mode === 'image_caption' ? 'generate-caption' : 
-                   mode === 'image_keyword' ? 'generate-keywords' : 
+
+   const endpoint = mode === 'image_caption' ? 'generate-caption' :
+                   mode === 'image_keyword' ? 'generate-keywords' :
                    'generate-image';
-   
+
    const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s for image processing
-   
+   const timeoutId = setTimeout(() => controller.abort(), 25000);
+
    fetch(imageUrl)
      .then(response => {
        if (!response.ok) {
@@ -539,51 +455,63 @@ if (request.type === 'context_aware_magic_pill') {
    return true;
  }
 
-// Context Summary Handler
- if (request.type === 'context_summary') {
-   const controller = new AbortController();
-   const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s for context summary
-   
-   createHeaders().then(headers => {
-     fetch('https://afaque.pythonanywhere.com/generate-context-summary', {
-       method: 'POST',
-       headers: headers,
-       body: JSON.stringify({
-         conversation: request.data.conversation,
-         platform: request.data.platform
-       }),
-       signal: controller.signal
-     })
-     .then(response => {
+ // AI Platform Custom Prompt Handler - USED for AI platform customize mode
+ if (request.type === 'ai_platform_custom') {
+   console.log('🎯 AI Platform custom prompt request:', {
+     text: request.data.text?.substring(0, 50) + '...',
+     customPrompt: request.data.customPrompt
+   });
+
+   (async () => {
+     const controller = new AbortController();
+     const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+     try {
+       const headers = await createHeaders();
+
+       const response = await fetch('https://afaque.pythonanywhere.com/ai-platform-custom', {
+         method: 'POST',
+         headers: headers,
+         body: JSON.stringify({
+           text: request.data.text,
+           customPrompt: request.data.customPrompt
+         }),
+         signal: controller.signal
+       });
+
        clearTimeout(timeoutId);
+       const data = await response.json();
+
        if (!response.ok) {
-         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+         console.error('❌ Backend error:', response.status, data);
+         sendResponse({
+           success: false,
+           error: data.error || `HTTP ${response.status}: ${response.statusText}`
+         });
+         return;
        }
-       return response.json();
-     })
-     .then(data => {
-       console.log('Context summary success:', data);
+
+       console.log('✅ AI Platform custom prompt success:', data);
        sendResponse({success: true, data});
-     })
-     .catch(error => {
+
+     } catch (error) {
        clearTimeout(timeoutId);
-       console.error('Context summary API error:', error);
-       
-       // Better error handling for different scenarios
-       let errorMessage = error.message;
+       console.error('❌ AI Platform custom prompt API error:', error);
+
+       let errorMessage = error.message || 'Unknown error';
        if (error.name === 'AbortError') {
-         errorMessage = 'Context summary timeout - please try again';
-       } else if (error.message.includes('Failed to fetch')) {
+         errorMessage = 'AI Platform custom prompt timeout - please try with shorter text';
+       } else if (errorMessage.includes('Failed to fetch')) {
          errorMessage = 'Network error - please check your connection';
        }
-       
+
        sendResponse({success: false, error: errorMessage});
-     });
-   });
+     }
+   })();
+
    return true;
  }
 
- // Return false for unhandled message types to prevent async response issues
+ // Return false for unhandled message types
  return false;
-
 });
