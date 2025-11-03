@@ -3271,6 +3271,24 @@ async function loadWorkflows() {
             ],
             timestamp: new Date().toISOString(),
             source: 'built_in'
+        },
+        {
+            id: 'workflow-poetrywriter',
+            name: 'PoetryWriter',
+            title: 'Poetry Writer Workflow',
+            steps: [
+                { number: 1, prompt: 'Write a {length} poem about {theme} in {style} style' },
+                { number: 2, prompt: 'Add vivid imagery and metaphors related to {theme}' },
+                { number: 3, prompt: 'Ensure the poem follows {style} structure and rhythm' },
+                { number: 4, prompt: 'Add a powerful conclusion that resonates with the {theme}' }
+            ],
+            variables: [
+                { name: 'theme', label: 'Theme', placeholder: 'e.g., nature, love, freedom' },
+                { name: 'style', label: 'Style', placeholder: 'e.g., haiku, sonnet, free verse' },
+                { name: 'length', label: 'Length', placeholder: 'e.g., short, medium, long' }
+            ],
+            timestamp: new Date().toISOString(),
+            source: 'built_in'
         }
     ];
     
@@ -8061,12 +8079,13 @@ content.textContent = step.prompt;
         workflowContainer.appendChild(stepBubble);
     });
     
-    // Clone button for built-in workflows
+    // Add Variables button for built-in workflows with variables OR Clone button for others
     if (isBuiltIn) {
-        const cloneBtn = document.createElement('button');
-        cloneBtn.id = 'clone-workflow-btn';
-        cloneBtn.dataset.workflowId = workflow.id;
-        cloneBtn.style.cssText = `
+        const hasVariables = workflow.variables && workflow.variables.length > 0;
+        const actionBtn = document.createElement('button');
+        actionBtn.id = hasVariables ? 'add-variables-btn' : 'clone-workflow-btn';
+        actionBtn.dataset.workflowId = workflow.id;
+        actionBtn.style.cssText = `
             width: 100%;
             background: rgba(255, 215, 0, 0.08);
             border: 1px solid rgba(255, 215, 0, 0.25);
@@ -8083,26 +8102,42 @@ content.textContent = step.prompt;
             justify-content: center;
             gap: 8px;
         `;
-        cloneBtn.innerHTML = `
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            Create Editable Copy
-        `;
-        
-        cloneBtn.addEventListener('mouseenter', () => {
-            cloneBtn.style.background = 'rgba(255, 215, 0, 0.12)';
-            cloneBtn.style.borderColor = 'rgba(255, 215, 0, 0.35)';
-            cloneBtn.style.transform = 'translateY(-1px)';
+
+        if (hasVariables) {
+            actionBtn.innerHTML = `
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Add Variables
+            `;
+
+            // Click handler for Add Variables
+            actionBtn.addEventListener('click', () => {
+                showVariableInputForm(workflow);
+            });
+        } else {
+            actionBtn.innerHTML = `
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Create Editable Copy
+            `;
+        }
+
+        actionBtn.addEventListener('mouseenter', () => {
+            actionBtn.style.background = 'rgba(255, 215, 0, 0.12)';
+            actionBtn.style.borderColor = 'rgba(255, 215, 0, 0.35)';
+            actionBtn.style.transform = 'translateY(-1px)';
         });
-        cloneBtn.addEventListener('mouseleave', () => {
-            cloneBtn.style.background = 'rgba(255, 215, 0, 0.08)';
-            cloneBtn.style.borderColor = 'rgba(255, 215, 0, 0.25)';
-            cloneBtn.style.transform = 'translateY(0)';
+        actionBtn.addEventListener('mouseleave', () => {
+            actionBtn.style.background = 'rgba(255, 215, 0, 0.08)';
+            actionBtn.style.borderColor = 'rgba(255, 215, 0, 0.25)';
+            actionBtn.style.transform = 'translateY(0)';
         });
-        
-        workflowContainer.appendChild(cloneBtn);
+
+        workflowContainer.appendChild(actionBtn);
     }
 
     // Add New Step button for user-created workflows
@@ -8212,6 +8247,380 @@ if (!isBuiltIn) {
 } else {
     attachCloneButtonListener(workflow);
 }
+}
+
+// ========== VARIABLE INPUT FORM ==========
+function showVariableInputForm(workflow) {
+    const outputText = shadowRoot.getElementById('output-text');
+
+    // Clear output and create variable form container
+    outputText.innerHTML = '';
+    outputText.className = 'output-text';
+
+    // ✅ Same pattern as workflow steps: disable scroll on outer container
+    outputText.style.overflowY = 'hidden';
+    outputText.style.maxHeight = 'none';
+    outputText.style.padding = '12px';
+
+    // ✅ Create inner scrollable container (accounting for header ~60px in 400px total)
+    const scrollableContainer = document.createElement('div');
+    scrollableContainer.style.cssText = `
+        max-height: 280px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0;
+    `;
+
+    const formContainer = document.createElement('div');
+    formContainer.id = 'variable-form-container';
+    formContainer.style.cssText = `
+        padding: 20px;
+        max-width: 500px;
+        margin: 0 auto;
+        box-sizing: border-box;
+    `;
+
+    // Form title
+    const title = document.createElement('h3');
+    title.textContent = 'Add Variables';
+    title.style.cssText = `
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        text-align: center;
+    `;
+    formContainer.appendChild(title);
+
+    // Subtitle
+    const subtitle = document.createElement('p');
+    subtitle.textContent = `Fill in the variables for: ${workflow.title}`;
+    subtitle.style.cssText = `
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 13px;
+        margin-bottom: 24px;
+        text-align: center;
+    `;
+    formContainer.appendChild(subtitle);
+
+    // Create input fields for each variable
+    const variableValues = {};
+
+    workflow.variables.forEach(variable => {
+        const fieldGroup = document.createElement('div');
+        fieldGroup.style.cssText = `
+            margin-bottom: 20px;
+        `;
+
+        const label = document.createElement('label');
+        label.textContent = variable.label + ':';
+        label.style.cssText = `
+            display: block;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        `;
+        fieldGroup.appendChild(label);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = variable.placeholder;
+        input.dataset.variableName = variable.name;
+        input.style.cssText = `
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        `;
+
+        input.addEventListener('focus', () => {
+            input.style.borderColor = 'rgba(255, 215, 0, 0.5)';
+            input.style.background = 'rgba(255, 255, 255, 0.08)';
+        });
+
+        input.addEventListener('blur', () => {
+            input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            input.style.background = 'rgba(255, 255, 255, 0.05)';
+        });
+
+        fieldGroup.appendChild(input);
+        formContainer.appendChild(fieldGroup);
+    });
+
+    // Button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        justify-content: center;
+    `;
+
+    // Cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = `
+        padding: 10px 24px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+
+    cancelBtn.addEventListener('mouseenter', () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.08)';
+    });
+    cancelBtn.addEventListener('mouseleave', () => {
+        cancelBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        // Go back to workflow view
+        displayWorkflowSteps(workflow);
+    });
+
+    buttonContainer.appendChild(cancelBtn);
+
+    // Save button
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Save';
+    saveBtn.style.cssText = `
+        padding: 10px 24px;
+        background: rgba(255, 215, 0, 0.1);
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        border-radius: 6px;
+        color: rgba(255, 215, 0, 0.95);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+
+    saveBtn.addEventListener('mouseenter', () => {
+        saveBtn.style.background = 'rgba(255, 215, 0, 0.15)';
+    });
+    saveBtn.addEventListener('mouseleave', () => {
+        saveBtn.style.background = 'rgba(255, 215, 0, 0.1)';
+    });
+
+    saveBtn.addEventListener('click', () => {
+        // Collect variable values
+        const inputs = formContainer.querySelectorAll('input[data-variable-name]');
+        let allFilled = true;
+
+        inputs.forEach(input => {
+            const value = input.value.trim();
+            if (!value) {
+                allFilled = false;
+                input.style.borderColor = 'rgba(255, 0, 0, 0.5)';
+            } else {
+                variableValues[input.dataset.variableName] = value;
+                input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            }
+        });
+
+        if (!allFilled) {
+            showNotification('Please fill in all variables', 'error');
+            return;
+        }
+
+        // Show inline confirmation
+        showInlineConfirmation(formContainer, workflow, variableValues);
+    });
+
+    buttonContainer.appendChild(saveBtn);
+    formContainer.appendChild(buttonContainer);
+
+    // ✅ Nest containers: formContainer → scrollableContainer → outputText
+    scrollableContainer.appendChild(formContainer);
+    outputText.appendChild(scrollableContainer);
+}
+
+// ========== INLINE SAVE CONFIRMATION ==========
+function showInlineConfirmation(formContainer, workflow, variableValues) {
+    // Hide all form content (h3, p, div - everything except confirmation section)
+    Array.from(formContainer.children).forEach(child => {
+        if (child.id !== 'save-confirmation-section') {
+            child.style.display = 'none';
+        }
+    });
+
+    // Create confirmation section
+    const confirmSection = document.createElement('div');
+    confirmSection.id = 'save-confirmation-section';
+    confirmSection.style.cssText = `
+        text-align: center;
+        padding: 20px;
+    `;
+
+    // Title
+    const title = document.createElement('h3');
+    title.textContent = 'Save to Custom Templates?';
+    title.style.cssText = `
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+    `;
+    confirmSection.appendChild(title);
+
+    // Description
+    const description = document.createElement('p');
+    description.textContent = 'Would you like to save this workflow with your variable values to your custom templates?';
+    description.style.cssText = `
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13px;
+        margin-bottom: 24px;
+        line-height: 1.5;
+    `;
+    confirmSection.appendChild(description);
+
+    // Button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    `;
+
+    // No button
+    const noBtn = document.createElement('button');
+    noBtn.textContent = 'No';
+    noBtn.style.cssText = `
+        padding: 10px 24px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+
+    noBtn.addEventListener('mouseenter', () => {
+        noBtn.style.background = 'rgba(255, 255, 255, 0.08)';
+    });
+    noBtn.addEventListener('mouseleave', () => {
+        noBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+    });
+
+    noBtn.addEventListener('click', () => {
+        // Create workflow with replaced variables (but don't save)
+        const workflowWithValues = replaceVariablesInWorkflow(workflow, variableValues);
+
+        // Show workflow execution view
+        displayWorkflowSteps(workflowWithValues);
+    });
+
+    buttonContainer.appendChild(noBtn);
+
+    // Yes button
+    const yesBtn = document.createElement('button');
+    yesBtn.textContent = 'Yes';
+    yesBtn.style.cssText = `
+        padding: 10px 24px;
+        background: rgba(255, 215, 0, 0.1);
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        border-radius: 6px;
+        color: rgba(255, 215, 0, 0.95);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+
+    yesBtn.addEventListener('mouseenter', () => {
+        yesBtn.style.background = 'rgba(255, 215, 0, 0.15)';
+    });
+    yesBtn.addEventListener('mouseleave', () => {
+        yesBtn.style.background = 'rgba(255, 215, 0, 0.1)';
+    });
+
+    yesBtn.addEventListener('click', async () => {
+        // Create workflow with replaced variables
+        const workflowWithValues = replaceVariablesInWorkflow(workflow, variableValues);
+
+        // Save to custom templates
+        await saveWorkflowToCustom(workflowWithValues);
+
+        // Show success notification
+        showNotification('Workflow saved to Custom templates!', 'success');
+
+        // Show workflow execution view
+        displayWorkflowSteps(workflowWithValues);
+    });
+
+    buttonContainer.appendChild(yesBtn);
+    confirmSection.appendChild(buttonContainer);
+    formContainer.appendChild(confirmSection);
+}
+
+// ========== REPLACE VARIABLES IN WORKFLOW ==========
+function replaceVariablesInWorkflow(workflow, variableValues) {
+    // Create a deep copy of the workflow
+    const workflowCopy = JSON.parse(JSON.stringify(workflow));
+
+    // Replace variables in each step's prompt
+    workflowCopy.steps = workflowCopy.steps.map(step => {
+        let prompt = step.prompt;
+
+        // Replace each variable with its value
+        Object.keys(variableValues).forEach(varName => {
+            const regex = new RegExp(`\\{${varName}\\}`, 'g');
+            prompt = prompt.replace(regex, variableValues[varName]);
+        });
+
+        return {
+            ...step,
+            prompt: prompt
+        };
+    });
+
+    // Remove variables array and update metadata
+    delete workflowCopy.variables;
+    workflowCopy.source = 'custom'; // Mark as custom
+    workflowCopy.id = `workflow-custom-${Date.now()}`; // Generate new ID
+    workflowCopy.timestamp = new Date().toISOString();
+
+    // Update title to indicate it's a custom version
+    const originalTitle = workflow.title.replace(' Workflow', '');
+    workflowCopy.title = `${originalTitle} (Custom)`;
+    workflowCopy.name = workflowCopy.title;
+
+    return workflowCopy;
+}
+
+// ========== SAVE WORKFLOW TO CUSTOM ==========
+async function saveWorkflowToCustom(workflow) {
+    try {
+        const data = await chrome.storage.local.get('workflows');
+        const workflows = data.workflows || [];
+
+        // Add the new workflow
+        workflows.push(workflow);
+
+        // Save to storage
+        await chrome.storage.local.set({ workflows });
+
+        return true;
+    } catch (error) {
+        console.error('Error saving workflow to custom:', error);
+        showNotification('Failed to save workflow', 'error');
+        return false;
+    }
 }
 
 function attachStepEditListeners(workflow) {
